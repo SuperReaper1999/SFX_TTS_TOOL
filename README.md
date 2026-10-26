@@ -115,7 +115,7 @@ Run `./run-sfx-designer.sh` once (to create `.venv`), then:
 ./install-local-kokoro-tts.sh
 ```
 
-This installs Kokoro into `.local-tts` inside the tool folder, and the model downloads into `.kokoro-cache` on the first generated line, just as on Windows. Kokoro needs a Python version it supports; check `kokoro`'s requirements on PyPI if pip reports that no matching version was found. On Linux, pip's default PyTorch build includes NVIDIA CUDA libraries and is several gigabytes. If you only want the smaller CPU build, run `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu ./install-local-kokoro-tts.sh`.
+This installs Kokoro into `.local-tts` inside the tool folder, and the model downloads into `.kokoro-cache` on the first generated line, just as on Windows. Kokoro supports Python 3.10–3.12 only. If your system Python is newer, unpack a standalone Python 3.12 (for example an `install_only` build from [python-build-standalone](https://github.com/astral-sh/python-build-standalone/releases)) into `.python312` in the tool folder, so that `.python312/bin/python3` exists. The installer and Dialogue Studio both use it automatically, while the designer itself keeps running on your system Python. On Linux, pip's default PyTorch build includes NVIDIA CUDA libraries and is several gigabytes. If you only want the smaller CPU build, run `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu ./install-local-kokoro-tts.sh`.
 
 ### Recommended Unity workflow
 
