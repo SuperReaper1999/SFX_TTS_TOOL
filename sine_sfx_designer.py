@@ -1,7 +1,6 @@
 """Standalone procedural SFX designer with Unity-ready WAV export.
 
-Requires Python 3 on Windows. The audio engine deliberately uses only the
-standard library so the tool can travel with the Unity project.
+Runs on Windows and Linux (including Kubuntu) with Python 3, Tk, and NumPy.
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ from typing import Any
 
 import numpy as np
 
+import audio_playback
 from dialogue_studio import DialogueStudio
 
 try:
@@ -30,10 +30,6 @@ try:
 except ImportError:  # pragma: no cover - only relevant to unusual Python installs
     tk = None
 
-try:
-    import winsound
-except ImportError:  # pragma: no cover - enables non-Windows self-tests
-    winsound = None
 
 
 APP_TITLE = "Unity SFX Designer"
@@ -647,7 +643,10 @@ class SfxDesigner:
 
     @staticmethod
     def _favourites_path() -> Path:
-        app_data = Path(os.environ.get("APPDATA", str(Path.home()))) / "UnitySfxDesigner"
+        if os.name == "nt":
+            app_data = Path(os.environ.get("APPDATA", str(Path.home()))) / "UnitySfxDesigner"
+        else:
+            app_data = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "UnitySfxDesigner"
         return app_data / "preset_favourites.json"
 
     def _load_favorite_presets(self) -> set[str]:
@@ -1268,10 +1267,9 @@ class SfxDesigner:
             file_handle.close()
             self.preview_file = file_handle.name
             write_wav(self.preview_file, samples, state["sample_rate"])
-            if winsound is None:
-                self.status.set("Preview is only available on Windows. WAV was generated successfully.")
+            if not audio_playback.play_wav(self.preview_file):
+                self.status.set(f"WAV was generated, but could not be played. {audio_playback.unavailable_reason()}")
                 return
-            winsound.PlaySound(self.preview_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
             self.status.set("Preview playing")
         except (ValueError, OSError, OverflowError) as error:
             messagebox.showerror(APP_TITLE, str(error))
@@ -1287,17 +1285,15 @@ class SfxDesigner:
             file_handle.close()
             self.preview_file = file_handle.name
             write_wav(self.preview_file, samples, state["sample_rate"])
-            if winsound is not None:
-                winsound.PlaySound(self.preview_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            if audio_playback.play_wav(self.preview_file):
                 self.status.set("Song preview playing")
             else:
-                self.status.set("Song preview rendered; playback is only available on Windows.")
+                self.status.set(f"Song preview rendered, but could not be played. {audio_playback.unavailable_reason()}")
         except (ValueError, OSError, OverflowError) as error:
             messagebox.showerror(APP_TITLE, str(error))
 
     def stop_preview(self) -> None:
-        if winsound is not None:
-            winsound.PlaySound(None, 0)
+        audio_playback.stop()
         if self.preview_file:
             try:
                 os.unlink(self.preview_file)

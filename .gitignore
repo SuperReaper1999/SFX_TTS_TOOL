@@ -11,3 +11,4 @@ __pycache__/
 .installer-temp/
 GeneratedDialogue/
 .python312/
+.venv/

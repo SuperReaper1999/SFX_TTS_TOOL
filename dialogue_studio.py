@@ -12,6 +12,8 @@ from typing import Callable
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import audio_playback
+
 KOKORO_VOICES = (
     "bf_emma", "bf_isabella", "bf_lily", "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
     "af_heart", "af_bella", "af_nicole", "am_fenrir", "am_michael", "am_onyx",
@@ -40,7 +42,7 @@ def generate_kokoro_wav(text: str, voice: str, speed: float, output_path: Path) 
     if not 0.5 <= speed <= 1.5:
         raise ValueError("Speech speed must be between 0.5 and 1.5.")
     tool_root = Path(__file__).resolve().parent
-    local_python = tool_root / ".python312" / "python.exe"
+    local_python = tool_root / ".python312" / ("python.exe" if os.name == "nt" else "bin/python3")
     python_executable = str(local_python) if local_python.is_file() else sys.executable
     command = [
         python_executable, "-m", "kokoro", "--text", text, "--voice", voice,
@@ -66,7 +68,7 @@ def generate_kokoro_wav(text: str, voice: str, speed: float, output_path: Path) 
     if result.returncode != 0:
         output = (result.stderr or result.stdout).strip()
         if "No module named kokoro" in output or "No module named 'kokoro'" in output:
-            raise RuntimeError("Kokoro is not installed. Run Install Local Kokoro TTS.bat from this tool folder")
+            raise RuntimeError("Kokoro is not installed. Run Install Local Kokoro TTS.bat (Windows) or install-local-kokoro-tts.sh (Linux) from this tool folder")
         raise RuntimeError(f"Kokoro generation failed:\n{output or 'No details returned.'}")
     if not output_path.is_file() or output_path.stat().st_size < 44:
         raise RuntimeError("Kokoro did not produce a valid WAV file.")
@@ -267,7 +269,7 @@ class DialogueStudio:
         if not path.is_file():
             messagebox.showwarning("Dialogue Studio", f"No generated WAV found yet for {line['line_id']}."); return
         try:
-            import winsound
-            winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC)
+            if not audio_playback.play_wav(str(path)):
+                messagebox.showwarning("Dialogue Studio", audio_playback.unavailable_reason())
         except Exception as error:
             messagebox.showerror("Dialogue Studio", f"Could not preview WAV:\n{error}")

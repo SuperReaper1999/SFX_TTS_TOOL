@@ -1,6 +1,6 @@
 # Unity SFX Designer
 
-A standalone Windows utility for building procedural combat, creature, UI, and ambience sound effects and exporting them as Unity-ready WAV files.
+A standalone Windows and Linux (including Kubuntu) utility for building procedural combat, creature, UI, and ambience sound effects and exporting them as Unity-ready WAV files.
 
 Created by [SuperReaper1999](https://github.com/SuperReaper1999) with OpenAI Codex.
 
@@ -26,6 +26,22 @@ python -m tkinter
 
 That command should open a small Tk demo window. If it reports an `init.tcl` or Tcl/Tk error, repair or reinstall Python with the **tcl/tk and IDLE** optional feature selected; the designer itself needs no Python packages beyond that standard component.
 
+### Linux (Kubuntu)
+
+Install Python, venv, and Tk once:
+
+```bash
+sudo apt install python3 python3-venv python3-tk
+```
+
+Then run from the tool folder:
+
+```bash
+./run-sfx-designer.sh
+```
+
+The first run creates a private `.venv` in the tool folder and installs NumPy into it, so nothing is installed system-wide. Previews play through the first available command-line player: `pw-play` (PipeWire, standard on current Kubuntu), `paplay`, `aplay`, or `ffplay`. If none is present, install `pipewire-bin`, `pulseaudio-utils`, or `alsa-utils`. Preset favourites are stored in `~/.config/UnitySfxDesigner/`.
+
 ## Workflow
 
 1. Use the **Design**, **Realism**, and **Mix & Export** tabs to shape the sound.
@@ -43,7 +59,7 @@ The Realism tab adds 4× oversampled rendering, white/pink/brown/band-limited no
 
 ## Preset browser
 
-The preset browser keeps the built-in library out of the way of the design controls while making it quick to reuse. Filter by category, type part of a preset or category name, and use **Add favourite** for frequently used sounds. Favourites are stored locally in your Windows app-data folder, so updating the tool does not alter your project files or Git working tree.
+The preset browser keeps the built-in library out of the way of the design controls while making it quick to reuse. Filter by category, type part of a preset or category name, and use **Add favourite** for frequently used sounds. Favourites are stored locally in your Windows app-data folder (or `~/.config/UnitySfxDesigner` on Linux), so updating the tool does not alter your project files or Git working tree.
 
 ## Piano roll
 
@@ -64,6 +80,8 @@ Use **Export Unity Pack** to write one or more Unity-ready WAVs and a matching `
 ```powershell
 python sine_sfx_designer.py --self-test
 ```
+
+On Linux: `./run-sfx-designer.sh --self-test`
 
 This exports every built-in preset to a temporary location and verifies the required Unity WAV format.
 
@@ -88,6 +106,16 @@ S:\Repos\Unity-SFX-Designer\.kokoro-cache
 ```
 
 The installer sets its package, download, temporary, and model locations beneath this tool folder. It does not use C: for the installation or model cache. The download needs internet once; generation is offline afterwards.
+
+### Linux setup
+
+Run `./run-sfx-designer.sh` once (to create `.venv`), then:
+
+```bash
+./install-local-kokoro-tts.sh
+```
+
+This installs Kokoro into `.local-tts` inside the tool folder, and the model downloads into `.kokoro-cache` on the first generated line, just as on Windows. Kokoro needs a Python version it supports; check `kokoro`'s requirements on PyPI if pip reports that no matching version was found. On Linux, pip's default PyTorch build includes NVIDIA CUDA libraries and is several gigabytes. If you only want the smaller CPU build, run `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu ./install-local-kokoro-tts.sh`.
 
 ### Recommended Unity workflow
 
