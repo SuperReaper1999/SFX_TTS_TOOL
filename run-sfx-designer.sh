@@ -10,11 +10,6 @@ if ! command -v "$PYTHON" >/dev/null 2>&1; then
     echo "Python 3 was not found. Install it with: sudo apt install python3 python3-venv python3-tk"
     exit 1
 fi
-if ! "$PYTHON" -c "import tkinter" >/dev/null 2>&1; then
-    echo "Tkinter is missing. Install it with: sudo apt install python3-tk"
-    exit 1
-fi
-
 VENV="$TOOL_ROOT/.venv"
 if [ ! -x "$VENV/bin/python" ]; then
     echo "Creating virtual environment in $VENV ..."
@@ -26,6 +21,11 @@ fi
 if ! "$VENV/bin/python" -c "import numpy" >/dev/null 2>&1; then
     echo "Installing NumPy into $VENV ..."
     "$VENV/bin/python" -m pip install -r "$TOOL_ROOT/requirements.txt"
+fi
+# Tkinter may be system-wide or extracted into .venv, so check it with the venv's Python.
+if ! "$VENV/bin/python" -c "import tkinter" >/dev/null 2>&1; then
+    echo "Tkinter is missing. Install it with: sudo apt install python3-tk"
+    exit 1
 fi
 
 exec "$VENV/bin/python" "$TOOL_ROOT/sine_sfx_designer.py" "$@"
