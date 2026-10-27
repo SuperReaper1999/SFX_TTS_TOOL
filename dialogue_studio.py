@@ -32,6 +32,15 @@ def safe_filename(value: str) -> str:
     return cleaned.strip("_") or "dialogue_line"
 
 
+def read_manifest_lines(path: Path) -> list[dict[str, str]]:
+    """Return the line entries of an existing manifest, or an empty list if it is missing or unreadable."""
+    try:
+        lines = json.loads(path.read_text(encoding="utf-8")).get("lines", [])
+    except (OSError, ValueError, AttributeError):
+        return []
+    return [line for line in lines if isinstance(line, dict)] if isinstance(lines, list) else []
+
+
 def kokoro_language_for_voice(voice: str) -> str:
     return "b" if voice.startswith("b") else "a"
 
@@ -249,8 +258,18 @@ class DialogueStudio:
         if self.generate_queue_button is not None: self.generate_queue_button.configure(state=state)
 
     def _write_manifest_file(self, directory: Path, lines: list[dict[str, str]]) -> Path:
+        """Merge ``lines`` into the folder's manifest, so generating one line keeps every earlier entry."""
         path = directory / "dialogue_manifest.json"
-        path.write_text(json.dumps({"format": "dialogue-manifest-v1", "engine": "kokoro-local", "notes": "Assign each generated WAV to the dialogue line with the matching line ID.", "lines": lines}, indent=2, ensure_ascii=False), encoding="utf-8")
+        merged = read_manifest_lines(path)
+        positions = {(line.get("speaker"), line.get("line_id")): index for index, line in enumerate(merged)}
+        for line in lines:
+            key = (line.get("speaker"), line.get("line_id"))
+            if key in positions:
+                merged[positions[key]] = {**merged[positions[key]], **line}
+            else:
+                positions[key] = len(merged)
+                merged.append(line)
+        path.write_text(json.dumps({"format": "dialogue-manifest-v1", "engine": "kokoro-local", "notes": "Assign each generated WAV to the dialogue line with the matching line ID.", "lines": merged}, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
 
     def _write_manifest(self) -> None:

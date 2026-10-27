@@ -78,7 +78,6 @@ def default_state() -> dict[str, Any]:
         "noise_color": "white",
         "noise_gain": 0.0,
         "noise_seed": 1337,
-        "lowpass_hz": 0.0,
         "distortion": 0.0,
         "delay_time": 0.0,
         "delay_feedback": 0.25,
@@ -140,7 +139,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "Hit": make_preset(
         "Hit", name="Hit", duration=0.22, attack=0.001, decay=0.04,
         sustain=0.0, release=0.08, noise_enabled=True, noise_gain=0.13,
-        lowpass_hz=3800, distortion=0.18, layers=[
+        filter_cutoff_hz=3800, distortion=0.18, layers=[
             asdict(Layer(True, 210, 0.6, 0, -150, 0, 0, 0.2)),
             asdict(Layer(True, 580, 0.13, 0, -420, 0, 0, 0.08)),
             asdict(Layer()), asdict(Layer()),
@@ -149,7 +148,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "Gunshot Impact": make_preset(
         "Gunshot Impact", name="Gunshot_Impact", duration=0.42, attack=0.001,
         decay=0.03, sustain=0.0, release=0.22, noise_enabled=True, noise_gain=0.42,
-        lowpass_hz=5400, distortion=0.45, layers=[
+        filter_cutoff_hz=5400, distortion=0.45, layers=[
             asdict(Layer(True, 95, 0.72, 0, -65, 0, 0, 0.32)),
             asdict(Layer(True, 185, 0.3, 0, -100, 0, 0, 0.2)),
             asdict(Layer(True, 1350, 0.11, 0, -900, 0, 0, 0.07)),
@@ -159,7 +158,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "Explosion Burst": make_preset(
         "Explosion Burst", name="Explosion_Burst", duration=1.25, attack=0.002,
         decay=0.18, sustain=0.28, release=0.44, noise_enabled=True, noise_gain=0.5,
-        lowpass_hz=2200, distortion=0.35, reverb_mix=0.18, layers=[
+        filter_cutoff_hz=2200, distortion=0.35, reverb_mix=0.18, layers=[
             asdict(Layer(True, 58, 0.75, 0, -36, 0, 0, 0.9)),
             asdict(Layer(True, 112, 0.28, 0, -80, 0, 0, 0.55)),
             asdict(Layer(True, 260, 0.1, 0, -170, 0, 0, 0.2)),
@@ -168,7 +167,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     ),
     "Zombie Groan": make_preset(
         "Zombie Groan", name="Zombie_Groan", duration=1.8, attack=0.12, decay=0.16,
-        sustain=0.72, release=0.4, lowpass_hz=1250, distortion=0.12, layers=[
+        sustain=0.72, release=0.4, filter_cutoff_hz=1250, distortion=0.12, layers=[
             asdict(Layer(True, 110, 0.38, 0, -12, 8, 0, 1.8)),
             asdict(Layer(True, 164, 0.2, 70, -18, 5, 0.1, 1.6)),
             asdict(Layer(True, 55, 0.12, 0, 0, 0, 0, 1.8)),
@@ -177,7 +176,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     ),
     "Ambient Hum": make_preset(
         "Ambient Hum", name="Ambient_Hum", duration=3.0, attack=0.5, decay=0.2,
-        sustain=0.85, release=0.65, lowpass_hz=1500, layers=[
+        sustain=0.85, release=0.65, filter_cutoff_hz=1500, layers=[
             asdict(Layer(True, 60, 0.33, 0, 0, 0, 0, 3.0)),
             asdict(Layer(True, 120, 0.14, 0, 0, 0, 0, 3.0)),
             asdict(Layer(True, 180, 0.08, 0, 0, 0, 0, 3.0)),
@@ -201,7 +200,7 @@ PRESETS.update({
     "Melee Impact": make_preset("Melee Impact", name="Melee_Impact", duration=.3, attack=.001, decay=.025, sustain=0, release=.12, noise_enabled=True, noise_color="band", noise_gain=.3, transient_gain=.5, transient_decay=.016, filter_mode="bandpass", filter_cutoff_hz=1800, layers=[asdict(Layer(True, 165, .68, 0, -110, 0, 0, .22)), asdict(Layer()), asdict(Layer()), asdict(Layer())]),
     "Ricochet": make_preset("Ricochet", name="Ricochet", duration=.48, attack=.001, decay=.04, sustain=0, release=.25, pitch_drift_hz=30, reverb_mix=.15, layers=[asdict(Layer(True, 1600, .3, 0, 1200, -500, 0, .45)), asdict(Layer(True, 2800, .12, 0, 400, -1100, 0, .25)), asdict(Layer()), asdict(Layer())]),
     "Zombie Scream": make_preset("Zombie Scream", name="Zombie_Scream", duration=1.45, attack=.06, decay=.11, sustain=.6, release=.34, pitch_drift_hz=16, formant_low_hz=700, formant_high_hz=1800, distortion=.16, layers=[asdict(Layer(True, 260, .36, 0, -30, 85, 0, 1.45)), asdict(Layer(True, 390, .17, 0, -20, 65, 0, 1.2)), asdict(Layer()), asdict(Layer())]),
-    "Zombie Attack": make_preset("Zombie Attack", name="Zombie_Attack", duration=.62, attack=.01, decay=.07, sustain=.2, release=.24, noise_enabled=True, noise_color="pink", noise_gain=.14, formant_low_hz=520, formant_high_hz=1300, transient_gain=.18, layers=[asdict(Layer(True, 145, .42, 0, -45, 25, 0, .62)), asdict(Layer()), asdict(Layer()), asdict(Layer())]),
+    "Zombie Attack": make_preset("Zombie Attack", name="Zombie_Attack", duration=.62, attack=.01, decay=.07, sustain=.2, release=.24, noise_enabled=True, noise_color="pink", noise_gain=.0075, formant_low_hz=520, formant_high_hz=1300, transient_gain=.18, layers=[asdict(Layer(True, 145, .42, 0, -45, 25, 0, .62)), asdict(Layer()), asdict(Layer()), asdict(Layer())]),
 })
 PRESET_CATEGORIES["Combat"] += ("Pistol", "Rifle", "Shotgun", "Melee Impact", "Ricochet")
 PRESET_CATEGORIES["Creatures"] += ("Zombie Scream", "Zombie Attack")
@@ -211,10 +210,10 @@ PRESETS.update({
     "Snare": make_preset("Snare", name="Snare", duration=.28, attack=.001, decay=.03, sustain=0, release=.14, noise_enabled=True, noise_color="white", noise_gain=.55, filter_mode="bandpass", filter_cutoff_hz=2200, filter_resonance=.2, transient_gain=.5, transient_decay=.012, layers=[asdict(Layer(True, 195, .45, 0, -40, 0, 0, .1)), asdict(Layer(True, 330, .18, 0, -60, 0, 0, .08)), asdict(Layer()), asdict(Layer())]),
     "Closed Hi-Hat": make_preset("Closed Hi-Hat", name="Closed_Hi_Hat", duration=.09, attack=.0005, decay=.015, sustain=0, release=.05, noise_enabled=True, noise_color="white", noise_gain=.55, filter_mode="highpass", filter_cutoff_hz=7500, layers=[asdict(Layer(True, 5200, .08, 0, 0, 0, 0, .08)), asdict(Layer(True, 8200, .05, 0, 0, 0, 0, .06)), asdict(Layer()), asdict(Layer())]),
     "Open Hi-Hat": make_preset("Open Hi-Hat", name="Open_Hi_Hat", duration=.55, attack=.0005, decay=.05, sustain=.25, release=.4, noise_enabled=True, noise_color="white", noise_gain=.5, filter_mode="highpass", filter_cutoff_hz=7000, layers=[asdict(Layer(True, 5200, .07, 0, 0, 0, 0, .5)), asdict(Layer(True, 8200, .045, 0, 0, 0, 0, .45)), asdict(Layer()), asdict(Layer())]),
-    "Clap": make_preset("Clap", name="Clap", duration=.32, attack=.001, decay=.05, sustain=.05, release=.2, noise_enabled=True, noise_color="pink", noise_gain=.6, filter_mode="bandpass", filter_cutoff_hz=1700, filter_resonance=.25, reverb_mix=.12, transient_gain=.4, transient_decay=.02, layers=[asdict(Layer()), asdict(Layer()), asdict(Layer()), asdict(Layer())]),
+    "Clap": make_preset("Clap", name="Clap", duration=.32, attack=.001, decay=.05, sustain=.05, release=.2, noise_enabled=True, noise_color="pink", noise_gain=.04, filter_mode="bandpass", filter_cutoff_hz=1700, filter_resonance=.25, reverb_mix=.12, transient_gain=.4, transient_decay=.02, layers=[asdict(Layer()), asdict(Layer()), asdict(Layer()), asdict(Layer())]),
     "Rim Shot": make_preset("Rim Shot", name="Rim_Shot", duration=.14, attack=.0005, decay=.02, sustain=0, release=.08, noise_enabled=True, noise_color="band", noise_gain=.25, filter_mode="bandpass", filter_cutoff_hz=3200, transient_gain=.6, transient_decay=.006, layers=[asdict(Layer(True, 850, .5, 0, 300, -100, 0, .07)), asdict(Layer()), asdict(Layer()), asdict(Layer())]),
-    "Tom Low": make_preset("Tom Low", name="Tom_Low", duration=.42, attack=.001, decay=.08, sustain=.15, release=.28, lowpass_hz=1800, layers=[asdict(Layer(True, 110, .7, 0, 60, -15, 0, .3)), asdict(Layer(True, 90, .25, 0, 0, 0, .02, .4)), asdict(Layer()), asdict(Layer())]),
-    "Tom High": make_preset("Tom High", name="Tom_High", duration=.34, attack=.001, decay=.06, sustain=.12, release=.22, lowpass_hz=2400, layers=[asdict(Layer(True, 175, .7, 0, 80, -20, 0, .24)), asdict(Layer(True, 140, .22, 0, 0, 0, .02, .3)), asdict(Layer()), asdict(Layer())]),
+    "Tom Low": make_preset("Tom Low", name="Tom_Low", duration=.42, attack=.001, decay=.08, sustain=.15, release=.28, filter_cutoff_hz=1800, layers=[asdict(Layer(True, 110, .7, 0, 60, -15, 0, .3)), asdict(Layer(True, 90, .25, 0, 0, 0, .02, .4)), asdict(Layer()), asdict(Layer())]),
+    "Tom High": make_preset("Tom High", name="Tom_High", duration=.34, attack=.001, decay=.06, sustain=.12, release=.22, filter_cutoff_hz=2400, layers=[asdict(Layer(True, 175, .7, 0, 80, -20, 0, .24)), asdict(Layer(True, 140, .22, 0, 0, 0, .02, .3)), asdict(Layer()), asdict(Layer())]),
     "Crash Cymbal": make_preset("Crash Cymbal", name="Crash_Cymbal", duration=1.6, attack=.002, decay=.3, sustain=.35, release=1.1, noise_enabled=True, noise_color="white", noise_gain=.55, filter_mode="highpass", filter_cutoff_hz=4200, reverb_mix=.2, layers=[asdict(Layer(True, 3400, .05, 0, 0, 0, 0, 1.6)), asdict(Layer(True, 5200, .035, 0, 0, 0, 0, 1.5)), asdict(Layer(True, 7600, .02, 0, 0, 0, 0, 1.4)), asdict(Layer())]),
     "Cowbell": make_preset("Cowbell", name="Cowbell", duration=.3, attack=.001, decay=.05, sustain=.2, release=.2, layers=[asdict(Layer(True, 540, .55, 0, 0, 0, 0, .28, waveform="square")), asdict(Layer(True, 800, .35, 0, 0, 0, 0, .24, waveform="square")), asdict(Layer()), asdict(Layer())]),
     "Bass Pluck": make_preset("Bass Pluck", name="Bass_Pluck", duration=.5, attack=.002, decay=.12, sustain=.3, release=.28, filter_mode="lowpass", filter_cutoff_hz=900, filter_envelope_amount=.4, layers=[asdict(Layer(True, 82, .8, 0, 0, 0, 0, .5, waveform="triangle")), asdict(Layer(True, 165, .2, 0, 0, 0, 0, .4, waveform="triangle")), asdict(Layer()), asdict(Layer())]),
@@ -250,7 +249,8 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
     if result["noise_color"] not in ("white", "pink", "brown", "band"):
         result["noise_color"] = "white"
     result["noise_seed"] = int(result["noise_seed"])
-    result["lowpass_hz"] = max(0.0, float(result["lowpass_hz"]))
+    # Older recipes kept a separate low-pass cutoff which was used when the main cutoff was off.
+    legacy_cutoff = max(0.0, float(result.pop("lowpass_hz", 0.0) or 0.0))
     result["distortion"] = clamp(float(result["distortion"]), 0.0, 1.0)
     result["delay_time"] = clamp(float(result["delay_time"]), 0.0, 2.0)
     result["delay_feedback"] = clamp(float(result["delay_feedback"]), 0.0, 0.95)
@@ -262,7 +262,7 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
     result["filter_mode"] = str(result["filter_mode"]).lower()
     if result["filter_mode"] not in ("lowpass", "highpass", "bandpass", "notch"):
         result["filter_mode"] = "lowpass"
-    result["filter_cutoff_hz"] = clamp(float(result["filter_cutoff_hz"]), 0.0, 20000.0)
+    result["filter_cutoff_hz"] = clamp(float(result["filter_cutoff_hz"]) or legacy_cutoff, 0.0, 20000.0)
     result["filter_resonance"] = clamp(float(result["filter_resonance"]), 0.0, 0.99)
     result["filter_envelope_amount"] = clamp(float(result["filter_envelope_amount"]), -1.0, 1.0)
     result["transient_gain"] = clamp(float(result["transient_gain"]), 0.0, 2.0)
@@ -410,10 +410,16 @@ def generate_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, 
 
     if state["noise_enabled"]:
         noise = random_source.normal(0, 1, count)
-        if state["noise_color"] in ("pink", "brown"):
+        if state["noise_color"] == "pink":
+            # Shape white noise to a 1/f power spectrum (-3 dB per octave), keeping white noise's level.
+            spectrum = np.fft.rfft(noise)
+            bins = np.arange(len(spectrum), dtype=np.float64)
+            bins[0] = np.inf
+            noise = np.fft.irfft(spectrum / np.sqrt(bins), n=count)
+            noise /= max(float(np.std(noise)), 1e-9)
+        elif state["noise_color"] == "brown":
             noise = np.cumsum(noise)
             noise /= max(np.max(np.abs(noise)), 1e-9)
-            if state["noise_color"] == "pink": noise = np.diff(noise, prepend=noise[0]) * 20
         if state["noise_color"] == "band": noise = np.convolve(noise, np.ones(9) / 9, mode="same")
         samples += noise * state["noise_gain"]
 
@@ -421,7 +427,7 @@ def generate_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, 
     samples *= master
     if state["transient_gain"]: samples += random_source.normal(0, 1, count) * state["transient_gain"] * np.exp(-time / state["transient_decay"])
 
-    cutoff = (state["filter_cutoff_hz"] or state["lowpass_hz"]) * (1 + state["filter_envelope_amount"] * (state["sustain"] - .5))
+    cutoff = state["filter_cutoff_hz"] * (1 + state["filter_envelope_amount"] * (state["sustain"] - .5))
     if cutoff > 0:
         alpha = min(.99, math.tau * cutoff / (rate + math.tau * cutoff))
         low = np.empty_like(samples); low[0] = samples[0]
@@ -472,6 +478,18 @@ def midi_frequency(midi: int) -> float:
     return 440.0 * (2.0 ** ((midi - 69) / 12.0))
 
 
+def instrument_root_frequency(instrument: dict[str, Any], preset_name: str) -> float:
+    """Return the frequency a piano-roll note's pitch is measured against.
+
+    Pitched instruments are tuned so their loudest enabled layer plays the written note.
+    Drums, and designs with no enabled layer, play at their natural pitch on C4 like a sampler.
+    """
+    layers = [layer for layer in instrument["layers"] if layer["enabled"] and layer["gain"] > 0]
+    if preset_name in PRESET_CATEGORIES["Drums"] or not layers:
+        return midi_frequency(60)
+    return max(layers, key=lambda layer: layer["gain"])["frequency"]
+
+
 def generate_music_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, Any]]:
     """Render the piano roll with the current SFX design acting as its instrument."""
     state = validate_state(raw_state)
@@ -482,7 +500,8 @@ def generate_music_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict
     for track_index, track in enumerate(state["music_tracks"]):
         if track["muted"]:
             continue
-        instrument_source = state if track["preset"] == "Custom" else PRESETS[track["preset"]]
+        instrument_source = state if track["preset"] == "Custom" else validate_state(PRESETS[track["preset"]])
+        root_frequency = instrument_root_frequency(instrument_source, track["preset"])
         for note_index, note in enumerate(track["notes"]):
             note_seconds = min(total_seconds - note["step"] * step_seconds, note["length"] * step_seconds)
             if note_seconds <= 0:
@@ -494,7 +513,7 @@ def generate_music_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict
             instrument["normalize"] = False
             instrument["master_gain"] *= track["volume"] * note["velocity"]
             instrument["noise_seed"] = state["noise_seed"] + track_index * 104729 + note_index * 7919
-            ratio = midi_frequency(note["midi"]) / 440.0
+            ratio = midi_frequency(note["midi"]) / root_frequency
             for layer in instrument["layers"]:
                 layer["frequency"] *= ratio
                 layer["sweep_start"] *= ratio
@@ -831,12 +850,11 @@ class SfxDesigner:
         ttk.Combobox(effects_frame, textvariable=self.global_vars["noise_color"], values=("white", "pink", "brown", "band"), state="readonly", width=8).grid(row=0, column=1, sticky="w", padx=(0, 8))
         self._add_field(effects_frame, 0, 2, "Noise gain", "noise_gain", 0.0)
         self._add_field(effects_frame, 0, 4, "Seed", "noise_seed", 1337)
-        self._add_field(effects_frame, 1, 0, "Low-pass Hz (0 off)", "lowpass_hz", 0.0, 12)
-        self._add_field(effects_frame, 1, 2, "Distortion", "distortion", 0.0)
-        self._add_field(effects_frame, 1, 4, "Delay seconds", "delay_time", 0.0)
-        self._add_field(effects_frame, 1, 6, "Delay feedback", "delay_feedback", 0.25)
-        self._add_field(effects_frame, 2, 0, "Delay mix", "delay_mix", 0.0)
-        self._add_field(effects_frame, 2, 2, "Reverb mix", "reverb_mix", 0.0)
+        self._add_field(effects_frame, 1, 0, "Distortion", "distortion", 0.0)
+        self._add_field(effects_frame, 1, 2, "Delay seconds", "delay_time", 0.0)
+        self._add_field(effects_frame, 1, 4, "Delay feedback", "delay_feedback", 0.25)
+        self._add_field(effects_frame, 1, 6, "Delay mix", "delay_mix", 0.0)
+        self._add_field(effects_frame, 2, 0, "Reverb mix", "reverb_mix", 0.0)
 
         realism_frame = ttk.LabelFrame(realism_tab, text="Realism DSP", padding=8)
         realism_frame.grid(row=3, column=0, sticky="ew", pady=(0, 8))
@@ -846,7 +864,7 @@ class SfxDesigner:
         ttk.Label(realism_frame, text="Filter").grid(row=0, column=2, sticky="w", padx=(0, 4))
         self.global_vars["filter_mode"] = tk.StringVar(value="lowpass")
         ttk.Combobox(realism_frame, textvariable=self.global_vars["filter_mode"], values=("lowpass", "highpass", "bandpass", "notch"), state="readonly", width=10).grid(row=0, column=3, sticky="w", padx=(0, 10))
-        self._add_field(realism_frame, 0, 4, "Cutoff Hz", "filter_cutoff_hz", 0.0)
+        self._add_field(realism_frame, 0, 4, "Cutoff Hz (0 off)", "filter_cutoff_hz", 0.0)
         self._add_field(realism_frame, 0, 6, "Resonance", "filter_resonance", 0.0)
         self._add_field(realism_frame, 1, 0, "Filter envelope", "filter_envelope_amount", 0.0)
         self._add_field(realism_frame, 1, 2, "Transient", "transient_gain", 0.0)
@@ -1129,7 +1147,7 @@ class SfxDesigner:
         state = default_state()
         for key in ("name",):
             state[key] = self.global_vars[key].get()
-        for key in ("duration", "master_gain", "attack", "decay", "sustain", "release", "noise_gain", "lowpass_hz", "distortion", "delay_time", "delay_feedback", "delay_mix", "reverb_mix", "filter_cutoff_hz", "filter_resonance", "filter_envelope_amount", "transient_gain", "transient_decay", "pitch_drift_hz", "pitch_jitter_hz", "formant_low_hz", "formant_high_hz"):
+        for key in ("duration", "master_gain", "attack", "decay", "sustain", "release", "noise_gain", "distortion", "delay_time", "delay_feedback", "delay_mix", "reverb_mix", "filter_cutoff_hz", "filter_resonance", "filter_envelope_amount", "transient_gain", "transient_decay", "pitch_drift_hz", "pitch_jitter_hz", "formant_low_hz", "formant_high_hz"):
             state[key] = self._number(self.global_vars[key], key.replace("_", " "))
         state["variation_amount"] = self._number(self.global_vars["variation_amount"], "variation percentage") / 100.0
         state["sample_rate"] = int(self.global_vars["sample_rate"].get())
@@ -1221,38 +1239,55 @@ class SfxDesigner:
         width, height = max(10, canvas.winfo_width()), max(10, canvas.winfo_height())
         middle = height / 2
         canvas.create_line(0, middle, width, middle, fill="#35445c")
-        points: list[float] = []
+        # Draw each pixel column's min-max range: averaging would cancel out
+        # anything that oscillates faster than one pixel and hide its level.
+        data = np.asarray(samples)
+        edges = np.linspace(0, len(data), width + 1).astype(int)
+        scale = height * 0.42
         for pixel in range(width):
-            start = int(pixel * len(samples) / width)
-            end = max(start + 1, int((pixel + 1) * len(samples) / width))
-            section = samples[start:end]
-            value = sum(section) / len(section)
-            points.extend((pixel, middle - value * (height * 0.42)))
-        if len(points) >= 4:
-            canvas.create_line(*points, fill="#63c5ff", width=1.4, smooth=True)
-        self._draw_spectrum(samples)
+            section = data[edges[pixel]:max(edges[pixel + 1], edges[pixel] + 1)]
+            if not len(section):
+                break
+            top, bottom = middle - float(section.max()) * scale, middle - float(section.min()) * scale
+            canvas.create_line(pixel, top, pixel, bottom + 1, fill="#63c5ff")
+        self._draw_spectrum(samples, _state["sample_rate"])
         self.status.set(f"Generated {len(samples):,} samples at {_state['sample_rate']:,} Hz")
 
-    def _draw_spectrum(self, samples: list[float]) -> None:
+    def _draw_spectrum(self, samples: list[float], sample_rate: int) -> None:
+        """Draw the whole sound's average spectrum, 20 Hz to Nyquist on a log axis, in dB."""
         canvas = self.spectrum_canvas
         canvas.delete("all")
         width, height = max(10, canvas.winfo_width()), max(10, canvas.winfo_height())
-        window = samples[:min(1024, len(samples))]
-        if not window:
+        data = np.asarray(samples)
+        if not len(data):
             return
-        bins = 40
-        magnitudes: list[float] = []
-        for bin_index in range(bins):
-            frequency_bin = bin_index + 1
-            real = sum(value * math.cos(math.tau * frequency_bin * index / len(window)) for index, value in enumerate(window))
-            imaginary = sum(value * math.sin(math.tau * frequency_bin * index / len(window)) for index, value in enumerate(window))
-            magnitudes.append(math.sqrt(real * real + imaginary * imaginary) / len(window))
-        peak = max(magnitudes, default=1.0) or 1.0
+        frame = 2048
+        if len(data) < frame:
+            data = np.pad(data, (0, frame - len(data)))
+        window = np.hanning(frame)
+        starts = range(0, len(data) - frame + 1, frame // 2)
+        power = np.mean([np.abs(np.fft.rfft(data[start:start + frame] * window)) ** 2 for start in starts], axis=0)
+        frequencies = np.fft.rfftfreq(frame, 1 / sample_rate)
+        bins, floor_db, label_space = 64, -60.0, 12
+        edges = np.geomspace(20.0, sample_rate / 2, bins + 1)
+        levels = np.array([
+            power[(frequencies >= low) & (frequencies < high)].max(initial=0.0)
+            if np.any((frequencies >= low) & (frequencies < high))
+            else power[np.argmin(np.abs(frequencies - math.sqrt(low * high)))]
+            for low, high in zip(edges, edges[1:])
+        ])
+        decibels = 10 * np.log10(np.maximum(levels / max(levels.max(), 1e-20), 1e-12))
         bar_width = width / bins
-        for index, magnitude in enumerate(magnitudes):
-            bar_height = (magnitude / peak) * (height - 14)
+        usable = height - label_space - 2
+        for index, level in enumerate(decibels):
+            bar_height = clamp((level - floor_db) / -floor_db, 0.0, 1.0) * usable
             x0 = index * bar_width + 1
-            canvas.create_rectangle(x0, height - bar_height - 1, x0 + bar_width - 2, height - 1, fill="#7ee787", outline="")
+            canvas.create_rectangle(x0, usable - bar_height + 1, x0 + bar_width - 1, usable + 1, fill="#7ee787", outline="")
+        for label, frequency in (("100", 100), ("1k", 1000), ("10k", 10000)):
+            if frequency < sample_rate / 2:
+                x = math.log(frequency / 20.0) / math.log(sample_rate / 2 / 20.0) * width
+                canvas.create_line(x, 0, x, usable + 1, fill="#35445c")
+                canvas.create_text(x + 2, height - 1, text=label, anchor="sw", fill="#8b98ad", font=("TkDefaultFont", 7))
 
     def apply_preset(self) -> None:
         self._load_state_into_ui(copy.deepcopy(PRESETS[self.preset_var.get()]))

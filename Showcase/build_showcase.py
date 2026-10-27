@@ -53,7 +53,7 @@ def make_sawtooth_showcase() -> dict:
     state = default_state()
     state.update({"name": "Sawtooth_Synth_Loop", "music_tempo_bpm": 124, "music_steps": 16, "master_gain": .9,
                   "attack": .006, "decay": .09, "sustain": .58, "release": .12,
-                  "lowpass_hz": 3200, "distortion": .08, "delay_time": .09, "delay_feedback": .24, "delay_mix": .16})
+                  "filter_cutoff_hz": 3200, "distortion": .08, "delay_time": .09, "delay_feedback": .24, "delay_mix": .16})
     state["layers"][0].update({"enabled": True, "waveform": "sawtooth", "frequency": 440, "gain": .6})
     state["layers"][1].update({"enabled": True, "waveform": "sawtooth", "frequency": 880, "gain": .16})
     state["layers"][2].update({"enabled": False})

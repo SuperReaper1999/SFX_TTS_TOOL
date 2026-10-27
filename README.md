@@ -46,7 +46,7 @@ The first run creates a private `.venv` in the tool folder and installs NumPy in
 
 1. Use the **Design**, **Realism**, and **Mix & Export** tabs to shape the sound.
 2. In the **Preset browser**, filter by category, search by name, or save commonly used sounds as favourites. Double-click to load; use **Preview selected** to load and audition a sound in one click.
-3. The waveform and spectrum update automatically after you pause editing briefly; **Refresh waveform** is still available on demand.
+3. The waveform (peak level over time) and spectrum (average level from 20 Hz to the top of the audible range, on a log scale) update automatically after you pause editing briefly; **Refresh waveform** is still available on demand.
 4. Select **Preview** to hear it, then **Stop** to stop playback.
 5. Use **Save Project** to retain all editable settings in JSON.
 6. Use **Export WAV** and choose any folder. The resulting file is a 44.1 kHz, 16-bit, mono PCM WAV.
@@ -55,7 +55,7 @@ Each of the four layers has its own sine, square, triangle, or sawtooth oscillat
 
 Use the **Quick global sliders** for fast shaping and the **Quick selected-layer sliders** for frequency, gain, FM depth, and LFO depth. Numeric fields remain available alongside them for exact values; the frequency slider uses a logarithmic scale so low and high frequencies are both practical to adjust.
 
-The Realism tab adds 4× oversampled rendering, white/pink/brown/band-limited noise, resonant filter modes, transient bursts, pitch drift/jitter, formant bands, soft distortion, feedback delay, and a compact mono room tail. These are tuned for weapon impacts and zombie vocalisations while retaining mono output that suits positional audio in game engines.
+The Realism tab adds a **High** render quality, which renders at 4× the sample rate and then softly filters back down. It noticeably softens content above about 10 kHz and does not band-limit the square and sawtooth oscillators. It also adds noise in four colours: white (flat), pink (falls 3 dB per octave), brown (falls 6 dB per octave), and band (gently low-passed white). There is one gentle filter (6 dB per octave) with a single **Cutoff Hz** control (0 turns it off) and four modes: low-pass, high-pass, bandpass (which multiplies the low and high bands, so it adds grit), and notch (which cuts high content by the resonance amount). **Resonance** only affects the bandpass and notch modes, and **Filter envelope** shifts the cutoff once, by the sustain level, rather than sweeping it over time. The rest of the tab covers transient bursts, pitch drift and jitter, formant tones (ring modulation at the chosen frequencies, which gives a metallic, vocal-ish edge rather than true vowel filtering), soft distortion, feedback delay, and a short room effect of four early echoes within about 0.1 s rather than a long reverb tail. These are tuned for weapon impacts and zombie vocalisations while retaining mono output that suits positional audio in game engines.
 
 ## Preset browser
 
@@ -63,7 +63,7 @@ The preset browser keeps the built-in library out of the way of the design contr
 
 ## Piano roll
 
-The **Piano** tab is a four-track game-music sequencer. Give each track a name, choose either the current design or a built-in preset as its instrument, adjust its volume, and mute it independently. **Edit** selects the track you change; **Show** overlays any number of tracks in the grid, using a distinct colour for each. Click cells to add/remove notes, or drag across cells to set a note length. The **Current-design wave** selector provides an immediate sine/square/triangle/sawtooth change for every enabled oscillator used by Custom tracks. Set the BPM, choose an 8-, 16-, or 32-step loop, then preview or export the complete loop as a game-ready WAV. **Load minor loop** and **Load major loop** replace only the note pattern on the selected track; they preserve every track and project setting.
+The **Piano** tab is a four-track game-music sequencer. Give each track a name, choose either the current design or a built-in preset as its instrument (pitched instruments are tuned so their loudest layer plays the written note, while drum presets and designs with no oscillator layers play at their natural pitch on C4, like a sampler), adjust its volume, and mute it independently. **Edit** selects the track you change; **Show** overlays any number of tracks in the grid, using a distinct colour for each. Click cells to add/remove notes, or drag across cells to set a note length. The **Current-design wave** selector provides an immediate sine/square/triangle/sawtooth change for every enabled oscillator used by Custom tracks. Set the BPM, choose an 8-, 16-, or 32-step loop, then preview or export the complete loop as a game-ready WAV. **Load minor loop** and **Load major loop** replace only the note pattern on the selected track; they preserve every track and project setting.
 
 Music notes, tempo, and loop length are saved in normal project JSON files alongside the synth settings. This is deliberately a compact sequencer for loops, stings, and menu music—not a replacement for a full DAW. Exported music remains mono to suit positional or UI playback; use the same project’s effects controls to shape the instrument and room tail.
 
@@ -87,7 +87,7 @@ This exports every built-in preset to a temporary location and verifies the requ
 
 ## Dialogue Studio (free local Kokoro TTS)
 
-The **Dialogue Studio** tab turns quest dialogue into WAV files with the free local Kokoro model. Add one line or queue a batch, choose a character profile/voice, choose a pace, and generate the WAVs into an output folder. It writes `dialogue_manifest.json` beside the audio, preserving the speaker, line ID, text, voice, speed, and filename so each clip can be matched to its dialogue line in your game.
+The **Dialogue Studio** tab turns quest dialogue into WAV files with the free local Kokoro model. Add one line or queue a batch, choose a character profile/voice, choose a pace, and generate the WAVs into an output folder. It writes `dialogue_manifest.json` beside the audio, preserving the speaker, line ID, text, voice, speed, and filename so each clip can be matched to its dialogue line in your game. Generating more lines into the same folder adds them to that manifest, and regenerating a line updates its existing entry.
 
 There is no API key, OpenAI account, or per-line bill. Kokoro runs locally after its one-time download. Its Apache-2.0 model weighs roughly 363 MB, so it is deliberately kept out of the repository and C: drive.
 
