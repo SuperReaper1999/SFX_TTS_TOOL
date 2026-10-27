@@ -89,6 +89,35 @@ This exports every built-in preset to a temporary location and verifies the requ
 
 The **Dialogue Studio** tab turns quest dialogue into WAV files with the free local Kokoro model. Add one line or queue a batch, choose a character profile/voice, choose a pace, and generate the WAVs into an output folder. It writes `dialogue_manifest.json` beside the audio, preserving the speaker, line ID, text, voice, speed, and filename so each clip can be matched to its dialogue line in your game. Generating more lines into the same folder adds them to that manifest, and regenerating a line updates its existing entry.
 
+Kokoro loads once per session: Dialogue Studio starts it in the background when you first open the tab, and keeps it running until you close the app. After that start (around 10 seconds on a typical CPU), each line takes about a second instead of reloading the model every time. If Kokoro fails, details are written to `.kokoro-cache/kokoro_worker.log`.
+
+The queue and output folder are saved automatically and restored next time you open the tool. Adding a line clears the text box and moves the line ID on to the next number (`autumn_intro_01` → `autumn_intro_02`).
+
+### Speaker profiles
+
+A profile remembers a speaker's Kokoro voice and character notes. Pick one to fill in its voice and notes, or type a new speaker name, set the voice and notes, and select **Save Profile**. **Delete Profile** removes the selected one; queued lines keep their own voice. Profiles are stored in your settings folder (`%APPDATA%\SfxTtsTool` on Windows, `~/.config/SfxTtsTool` on Linux) along with the saved queue.
+
+### Importing a script
+
+**Import Script…** adds a whole scene to the queue from a text or CSV file.
+
+A text script has one line of dialogue per line, written `Speaker: what they say`. Lines without a speaker use the currently selected speaker, and blank lines and lines starting with `#` are skipped:
+
+```text
+# Intro scene
+Autumn: Stay close. Whatever is out there heard the gunshot.
+Reeves: Right then. Kettle on, and nobody opens that door.
+```
+
+A CSV needs a header row with a `text` column, and can also have `speaker`, `line_id`, `voice`, `speed`, and `notes` columns:
+
+```text
+speaker,line_id,text,voice,speed
+Narrator,narr_open,The town fell quiet before dawn.,,0.9
+```
+
+Empty voice and notes come from the speaker's profile. Lines without an ID are numbered per speaker (`autumn_01`, `autumn_02`, …), skipping IDs already queued. A line with an explicit ID replaces the queued line with the same speaker and ID, so you can edit a script and import it again.
+
 There is no API key, OpenAI account, or per-line bill. Kokoro runs locally after its one-time download. Its Apache-2.0 model weighs roughly 363 MB, so it is deliberately kept out of the repository and C: drive.
 
 ### One-time local setup — S: only

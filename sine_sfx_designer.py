@@ -592,6 +592,7 @@ class SfxDesigner:
         self.quick_layer_scales: dict[str, tk.Scale] = {}
         self.quick_layer_values: dict[str, tk.StringVar] = {}
         self._quick_slider_synced: dict[str, float] = {}
+        self.quick_global_scales: dict[str, tk.Scale] = {}
         self.preset_var = tk.StringVar(value="Custom")
         self.preset_category_filter = tk.StringVar(value="All categories")
         self.preset_search_var = tk.StringVar()
@@ -647,13 +648,26 @@ class SfxDesigner:
     def _add_quick_slider(self, parent: ttk.Frame, row: int, column: int, label: str, key: str, minimum: float, maximum: float, resolution: float) -> None:
         ttk.Label(parent, text=label).grid(row=row, column=column, sticky="w", padx=(0, 4), pady=2)
         slider = tk.Scale(parent, from_=minimum, to=maximum, orient=tk.HORIZONTAL, resolution=resolution, showvalue=False, length=128,
-                          command=lambda value, field=key: self.global_vars[field].set(f"{float(value):.4g}"))
+                          command=lambda value, field=key: self._set_global_from_slider(field, float(value)))
         slider.grid(row=row, column=column + 1, sticky="ew", padx=(0, 4), pady=2)
         ttk.Entry(parent, textvariable=self.global_vars[key], width=7).grid(row=row, column=column + 2, sticky="w", padx=(0, 10), pady=2)
-        try:
-            slider.set(float(self.global_vars[key].get()))
-        except ValueError:
-            slider.set(minimum)
+        self.quick_global_scales[key] = slider
+        self._refresh_quick_global_sliders()
+
+    def _set_global_from_slider(self, key: str, value: float) -> None:
+        # As with the layer sliders, ignore Tk's delayed echo of a programmatic slider move.
+        synced = self._quick_slider_synced.pop(f"global:{key}", None)
+        if synced is not None and value == synced:
+            return
+        self.global_vars[key].set(f"{value:.4g}")
+
+    def _refresh_quick_global_sliders(self) -> None:
+        for key, slider in self.quick_global_scales.items():
+            try:
+                slider.set(float(self.global_vars[key].get()))
+            except ValueError:
+                continue
+            self._quick_slider_synced[f"global:{key}"] = float(slider.get())
 
     def _add_field(self, parent: ttk.Frame, row: int, column: int, label: str, key: str, default: Any, width: int = 9) -> None:
         variable = tk.StringVar(value=str(default))
@@ -1211,6 +1225,7 @@ class SfxDesigner:
             self.piano_waveform_var.set(self.layer_vars[0]["waveform"].get())
         self.state = state
         self._refresh_quick_layer_sliders()
+        self._refresh_quick_global_sliders()
         self._refresh_preset_browser()
         self.draw_piano_roll()
 
