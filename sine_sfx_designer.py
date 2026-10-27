@@ -591,6 +591,7 @@ class SfxDesigner:
         self.selected_layer_var = tk.IntVar(value=0)
         self.quick_layer_scales: dict[str, tk.Scale] = {}
         self.quick_layer_values: dict[str, tk.StringVar] = {}
+        self._quick_slider_synced: dict[str, float] = {}
         self.preset_var = tk.StringVar(value="Custom")
         self.preset_category_filter = tk.StringVar(value="All categories")
         self.preset_search_var = tk.StringVar()
@@ -1115,6 +1116,11 @@ class SfxDesigner:
         self.status.set(f"Loaded {label} loop notes into {selected_track['name'].get()}")
 
     def _set_selected_layer_from_slider(self, key: str, value: float, logarithmic: bool) -> None:
+        # Tk reports programmatic slider moves later, at the slider's rounded position.
+        # Ignore that echo so loading a preset never rewrites the exact field value.
+        synced = self._quick_slider_synced.pop(key, None)
+        if synced is not None and value == synced:
+            return
         if logarithmic:
             value = 20.0 * (1000.0 ** value)
         variable = self.layer_vars[self.selected_layer_var.get()][key]
@@ -1134,6 +1140,7 @@ class SfxDesigner:
                 slider.set(clamp(math.log(max(20.0, value) / 20.0, 1000.0), 0.0, 1.0))
             else:
                 slider.set(value)
+            self._quick_slider_synced[key] = float(slider.get())
             self.quick_layer_values[key].set(f"{value:.3g}")
 
     @staticmethod
