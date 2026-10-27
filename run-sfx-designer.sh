@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Linux (Kubuntu) launcher for Unity SFX Designer.
+# Linux (Kubuntu) launcher for SFX TTS Tool.
 # First run creates a private virtual environment in .venv and installs NumPy into it.
 set -euo pipefail
 TOOL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

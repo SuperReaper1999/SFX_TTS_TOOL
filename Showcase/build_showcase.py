@@ -1,4 +1,4 @@
-"""Render the editable Unity SFX Designer showcase pack."""
+"""Render the editable SFX TTS Tool showcase pack."""
 
 from __future__ import annotations
 

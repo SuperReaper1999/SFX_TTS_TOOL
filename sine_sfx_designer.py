@@ -1,4 +1,4 @@
-"""Standalone procedural SFX designer with Unity-ready WAV export.
+"""Standalone procedural SFX designer with game-ready WAV export.
 
 Runs on Windows and Linux (including Kubuntu) with Python 3, Tk, and NumPy.
 """
@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - only relevant to unusual Python instal
 
 
 
-APP_TITLE = "Unity SFX Designer"
+APP_TITLE = "SFX TTS Tool"
 PROJECT_VERSION = 2
 DEFAULT_SAMPLE_RATE = 44100
 MAX_DURATION_SECONDS = 12.0
@@ -373,7 +373,7 @@ def layer_envelope(time_seconds: float, layer: dict[str, Any]) -> float:
 
 
 def generate_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, Any]]:
-    """Synthesize deterministic high-quality mono audio, then downsample for Unity."""
+    """Synthesize deterministic high-quality mono audio, then downsample for game-ready export."""
     state = validate_state(raw_state)
     factor = 4 if state["render_quality"] == "high" else 1
     output_rate = state["sample_rate"]
@@ -507,7 +507,7 @@ def generate_music_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict
             mix[start:end] += np.asarray(note_samples[:end - start])
     peak = float(np.max(np.abs(mix))) if len(mix) else 0.0
     # Music is a complete mix rather than a one-shot layer: bring valid quiet
-    # loops up to a predictable Unity-friendly level while preserving silence.
+    # loops up to a predictable, game-friendly level while preserving silence.
     if peak > 1e-9:
         mix *= 0.9 / peak
     return np.clip(mix, -1, 1).tolist(), state
@@ -518,8 +518,8 @@ def safe_filename(name: str) -> str:
     return cleaned or "NewSound"
 
 
-def export_unity_pack(destination: str | Path, source: dict[str, Any], variation_count: int = 1) -> list[Path]:
-    """Write Unity-ready WAVs and their editable recipe into one folder."""
+def export_sound_pack(destination: str | Path, source: dict[str, Any], variation_count: int = 1) -> list[Path]:
+    """Write game-ready WAVs and their editable recipe into one folder."""
     if not 1 <= variation_count <= 50:
         raise ValueError("Variation count must be between 1 and 50.")
     destination = Path(destination)
@@ -603,7 +603,7 @@ class SfxDesigner:
         ttk.Button(toolbar, text="Stop", command=self.stop_preview).grid(row=0, column=4, padx=3)
         ttk.Button(toolbar, text="Export WAV", command=self.export_wav).grid(row=0, column=5, padx=3)
         ttk.Button(toolbar, text="Export Variations", command=self.export_variations).grid(row=0, column=6, padx=3)
-        ttk.Button(toolbar, text="Export Unity Pack", command=self.export_pack).grid(row=0, column=7, padx=3)
+        ttk.Button(toolbar, text="Export Sound Pack", command=self.export_pack).grid(row=0, column=7, padx=3)
 
         content = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         content.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
@@ -621,7 +621,7 @@ class SfxDesigner:
         self.spectrum_canvas = tk.Canvas(preview, height=145, background="#10131a", highlightthickness=0)
         self.spectrum_canvas.pack(fill="x", pady=(8, 12))
         self.spectrum_canvas.bind("<Configure>", lambda _event: self.refresh_waveform())
-        ttk.Label(preview, text="Output is 16-bit mono PCM WAV. Unity imports it directly as an AudioClip.", wraplength=330).pack(anchor="w")
+        ttk.Label(preview, text="Output is 16-bit mono PCM WAV, which game engines and audio tools import directly.", wraplength=330).pack(anchor="w")
         ttk.Label(self.root, textvariable=self.status, relief=tk.SUNKEN, anchor="w", padding=(8, 4)).grid(row=2, column=0, sticky="ew")
 
     def _add_quick_slider(self, parent: ttk.Frame, row: int, column: int, label: str, key: str, minimum: float, maximum: float, resolution: float) -> None:
@@ -642,16 +642,20 @@ class SfxDesigner:
         ttk.Entry(parent, textvariable=variable, width=width).grid(row=row, column=column + 1, sticky="w", padx=(0, 10), pady=2)
 
     @staticmethod
-    def _favourites_path() -> Path:
+    def _favourites_path(folder_name: str = "SfxTtsTool") -> Path:
         if os.name == "nt":
-            app_data = Path(os.environ.get("APPDATA", str(Path.home()))) / "UnitySfxDesigner"
+            app_data = Path(os.environ.get("APPDATA", str(Path.home()))) / folder_name
         else:
-            app_data = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "UnitySfxDesigner"
+            app_data = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / folder_name
         return app_data / "preset_favourites.json"
 
     def _load_favorite_presets(self) -> set[str]:
+        path = self._favourites_path()
+        if not path.is_file():
+            # Favourites saved before the rename live under the old folder name.
+            path = self._favourites_path("UnitySfxDesigner")
         try:
-            saved = json.loads(self._favourites_path().read_text(encoding="utf-8"))
+            saved = json.loads(path.read_text(encoding="utf-8"))
             return {name for name in saved if name in PRESETS and name != "Custom"}
         except (OSError, json.JSONDecodeError, TypeError):
             return set()
@@ -864,7 +868,7 @@ class SfxDesigner:
         self._add_quick_slider(quick_global_frame, 1, 3, "Release", "release", 0.0, 2.0, 0.01)
         self._add_quick_slider(quick_global_frame, 2, 0, "Distortion", "distortion", 0.0, 1.0, 0.01)
         self._add_quick_slider(quick_global_frame, 2, 3, "Reverb", "reverb_mix", 0.0, 1.0, 0.01)
-        ttk.Label(mix_tab, text="Preview, WAV export, variations, and Unity Pack export are available in the top toolbar.", wraplength=600).grid(row=1, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(mix_tab, text="Preview, WAV export, variations, and Sound Pack export are available in the top toolbar.", wraplength=600).grid(row=1, column=0, sticky="w", pady=(12, 0))
 
         layers_frame = ttk.LabelFrame(parent, text="Oscillator layers", padding=8)
         layers_frame.grid(row=5, column=0, sticky="nsew")
@@ -1263,7 +1267,7 @@ class SfxDesigner:
         try:
             samples, state = self._generate()
             self.stop_preview()
-            file_handle = tempfile.NamedTemporaryFile(prefix="unity_sfx_", suffix=".wav", delete=False)
+            file_handle = tempfile.NamedTemporaryFile(prefix="sfx_tts_", suffix=".wav", delete=False)
             file_handle.close()
             self.preview_file = file_handle.name
             write_wav(self.preview_file, samples, state["sample_rate"])
@@ -1281,7 +1285,7 @@ class SfxDesigner:
                 self.status.set("Add notes to the piano roll before previewing.")
                 return
             self.stop_preview()
-            file_handle = tempfile.NamedTemporaryFile(prefix="unity_music_", suffix=".wav", delete=False)
+            file_handle = tempfile.NamedTemporaryFile(prefix="sfx_tts_music_", suffix=".wav", delete=False)
             file_handle.close()
             self.preview_file = file_handle.name
             write_wav(self.preview_file, samples, state["sample_rate"])
@@ -1305,7 +1309,7 @@ class SfxDesigner:
         try:
             samples, state = self._generate()
             filename = filedialog.asksaveasfilename(
-                title="Export Unity-ready WAV",
+                title="Export game-ready WAV",
                 defaultextension=".wav",
                 initialfile=f"{state['name']}.wav",
                 filetypes=(("WAV audio", "*.wav"),),
@@ -1314,7 +1318,7 @@ class SfxDesigner:
                 return
             write_wav(filename, samples, state["sample_rate"])
             self.status.set(f"Exported {Path(filename).name}")
-            messagebox.showinfo(APP_TITLE, "Exported Unity-ready 16-bit mono WAV.\n\nDrag it into your Unity Assets folder or choose it in the Project window.")
+            messagebox.showinfo(APP_TITLE, "Exported game-ready 16-bit mono WAV.")
         except (ValueError, OSError, OverflowError) as error:
             messagebox.showerror(APP_TITLE, str(error))
 
@@ -1325,14 +1329,14 @@ class SfxDesigner:
                 self.status.set("Add notes to the piano roll before exporting.")
                 return
             filename = filedialog.asksaveasfilename(
-                title="Export Unity-ready music WAV", defaultextension=".wav",
+                title="Export game-ready music WAV", defaultextension=".wav",
                 initialfile=f"{state['name']}_Music.wav", filetypes=(("WAV audio", "*.wav"),),
             )
             if not filename:
                 return
             write_wav(filename, samples, state["sample_rate"])
             self.status.set(f"Exported song {Path(filename).name}")
-            messagebox.showinfo(APP_TITLE, "Exported Unity-ready 16-bit mono music WAV.")
+            messagebox.showinfo(APP_TITLE, "Exported game-ready 16-bit mono music WAV.")
         except (ValueError, OSError, OverflowError) as error:
             messagebox.showerror(APP_TITLE, str(error))
 
@@ -1350,22 +1354,22 @@ class SfxDesigner:
                 samples, normalized = generate_samples(variation)
                 write_wav(Path(destination) / f"{normalized['name']}.wav", samples, normalized["sample_rate"])
             self.status.set(f"Exported {count} deterministic variations to {Path(destination).name}")
-            messagebox.showinfo(APP_TITLE, f"Exported {count} Unity-ready WAV variations.")
+            messagebox.showinfo(APP_TITLE, f"Exported {count} game-ready WAV variations.")
         except (ValueError, OSError, OverflowError) as error:
             messagebox.showerror(APP_TITLE, str(error))
 
     def export_pack(self) -> None:
         try:
             source = self._state_from_ui()
-            count = simpledialog.askinteger(APP_TITLE, "How many WAVs in this Unity Pack?", parent=self.root, initialvalue=1, minvalue=1, maxvalue=50)
+            count = simpledialog.askinteger(APP_TITLE, "How many WAVs in this Sound Pack?", parent=self.root, initialvalue=1, minvalue=1, maxvalue=50)
             if count is None:
                 return
-            destination = filedialog.askdirectory(title="Choose a folder for the Unity Pack")
+            destination = filedialog.askdirectory(title="Choose a folder for the Sound Pack")
             if not destination:
                 return
-            output_paths = export_unity_pack(destination, source, count)
-            self.status.set(f"Exported Unity Pack: {len(output_paths) - 1} WAV(s) plus recipe JSON")
-            messagebox.showinfo(APP_TITLE, f"Exported {len(output_paths) - 1} Unity-ready WAV(s) and an editable .sfx.json recipe.")
+            output_paths = export_sound_pack(destination, source, count)
+            self.status.set(f"Exported Sound Pack: {len(output_paths) - 1} WAV(s) plus recipe JSON")
+            messagebox.showinfo(APP_TITLE, f"Exported {len(output_paths) - 1} game-ready WAV(s) and an editable .sfx.json recipe.")
         except (ValueError, OSError, OverflowError) as error:
             messagebox.showerror(APP_TITLE, str(error))
 
@@ -1402,7 +1406,7 @@ class SfxDesigner:
 
 
 def run_self_test() -> int:
-    """Validate all built-in presets and the exact Unity WAV contract."""
+    """Validate all built-in presets and the exact WAV export contract."""
     failures: list[str] = []
     # Synthesis must be deterministic: project save/load must never subtly
     # alter the resulting audio, especially when white noise is enabled.
@@ -1463,11 +1467,11 @@ def run_self_test() -> int:
         failures.append("Piano-roll music generation was invalid or non-deterministic")
 
     with tempfile.TemporaryDirectory(prefix="sfx_designer_pack_") as folder:
-        output_paths = export_unity_pack(folder, PRESETS["Pickup"], 3)
+        output_paths = export_sound_pack(folder, PRESETS["Pickup"], 3)
         if len(output_paths) != 4 or not all(path.exists() for path in output_paths):
-            failures.append("Unity Pack export did not write recipe and variations")
+            failures.append("Sound Pack export did not write recipe and variations")
         elif json.loads(output_paths[0].read_text(encoding="utf-8"))["name"] != "Pickup":
-            failures.append("Unity Pack recipe did not preserve editable state")
+            failures.append("Sound Pack recipe did not preserve editable state")
 
     with tempfile.TemporaryDirectory(prefix="sfx_designer_test_") as folder:
         for name, preset in PRESETS.items():
@@ -1484,7 +1488,7 @@ def run_self_test() -> int:
     if failures:
         print("Self-test failed:\n" + "\n".join(failures))
         return 1
-    print(f"Self-test passed: {len(PRESETS)} presets plus piano-roll music exported as 44.1 kHz 16-bit mono WAV; deterministic, waveform, modulation, effects, variation, Unity Pack, silence, and input-clamping checks passed.")
+    print(f"Self-test passed: {len(PRESETS)} presets plus piano-roll music exported as 44.1 kHz 16-bit mono WAV; deterministic, waveform, modulation, effects, variation, Sound Pack, silence, and input-clamping checks passed.")
     return 0
 
 

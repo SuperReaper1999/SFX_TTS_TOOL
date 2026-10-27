@@ -1,4 +1,4 @@
-"""Local Kokoro dialogue authoring panel for Unity SFX Designer."""
+"""Local Kokoro dialogue authoring panel for SFX TTS Tool."""
 
 import json
 import os
@@ -250,7 +250,7 @@ class DialogueStudio:
 
     def _write_manifest_file(self, directory: Path, lines: list[dict[str, str]]) -> Path:
         path = directory / "dialogue_manifest.json"
-        path.write_text(json.dumps({"format": "unity-dialogue-manifest-v1", "engine": "kokoro-local", "notes": "Assign generated WAV clips to matching DialogueNode voice clip slots.", "lines": lines}, indent=2, ensure_ascii=False), encoding="utf-8")
+        path.write_text(json.dumps({"format": "dialogue-manifest-v1", "engine": "kokoro-local", "notes": "Assign each generated WAV to the dialogue line with the matching line ID.", "lines": lines}, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
 
     def _write_manifest(self) -> None:

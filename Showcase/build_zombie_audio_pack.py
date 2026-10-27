@@ -42,7 +42,7 @@ def render(output: Path) -> None:
         normalized["name"] = name
         write_wav(output / f"{name}.wav", samples, normalized["sample_rate"])
         (output / f"{name}.sfx.json").write_text(json.dumps(normalized, indent=2), encoding="utf-8")
-    print(f"Rendered {len(build_states())} Unity-ready sound effects to {output}")
+    print(f"Rendered {len(build_states())} game-ready sound effects to {output}")
 
 
 if __name__ == "__main__":
