@@ -10,16 +10,19 @@ import copy
 import json
 import math
 import os
+import queue
 import random
 import struct
 import sys
 import tempfile
+import threading
 import wave
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+from scipy import signal
 
 import audio_playback
 from dialogue_studio import DialogueStudio
@@ -83,6 +86,7 @@ def default_state() -> dict[str, Any]:
         "delay_feedback": 0.25,
         "delay_mix": 0.0,
         "reverb_mix": 0.0,
+        "reverb_decay": 0.8,
         "render_quality": "high",
         "filter_mode": "lowpass",
         "filter_cutoff_hz": 0.0,
@@ -256,6 +260,7 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
     result["delay_feedback"] = clamp(float(result["delay_feedback"]), 0.0, 0.95)
     result["delay_mix"] = clamp(float(result["delay_mix"]), 0.0, 1.0)
     result["reverb_mix"] = clamp(float(result["reverb_mix"]), 0.0, 1.0)
+    result["reverb_decay"] = clamp(float(result["reverb_decay"]), 0.1, 8.0)
     result["render_quality"] = str(result["render_quality"]).lower()
     if result["render_quality"] not in ("draft", "high"):
         result["render_quality"] = "high"
@@ -372,6 +377,68 @@ def layer_envelope(time_seconds: float, layer: dict[str, Any]) -> float:
     return envelope(layer_time, max(0.0001, layer["end_time"] - layer["start_time"]), layer)
 
 
+FILTER_ENVELOPE_OCTAVES = 4.0
+REVERB_PREDELAY_SECONDS = 0.012
+
+
+def biquad_coefficients(mode: str, frequency: float, q: float, rate: float) -> tuple[np.ndarray, np.ndarray]:
+    """Return normalised (b, a) for an RBJ cookbook low-pass, high-pass, band-pass (0 dB peak) or notch filter."""
+    frequency = clamp(frequency, 10.0, rate * 0.45)
+    omega = math.tau * frequency / rate
+    cosine, alpha = math.cos(omega), math.sin(omega) / (2.0 * q)
+    if mode == "highpass":
+        b = ((1 + cosine) / 2, -(1 + cosine), (1 + cosine) / 2)
+    elif mode == "bandpass":
+        b = (alpha, 0.0, -alpha)
+    elif mode == "notch":
+        b = (1.0, -2 * cosine, 1.0)
+    else:
+        b = ((1 - cosine) / 2, 1 - cosine, (1 - cosine) / 2)
+    a = (1 + alpha, -2 * cosine, 1 - alpha)
+    return np.array(b) / a[0], np.array(a) / a[0]
+
+
+def resonance_q(resonance: float) -> float:
+    """Map the 0-0.99 resonance control to Q: 0.71 (no peak) up to about 11 (a sharp +21 dB peak)."""
+    return math.sqrt(0.5) * 16.0 ** resonance
+
+
+def apply_filter(samples: np.ndarray, mode: str, cutoff: np.ndarray | float, q: float, rate: float) -> np.ndarray:
+    """Filter with a fixed cutoff, or a per-sample cutoff array updated every millisecond."""
+    if np.isscalar(cutoff):
+        return signal.lfilter(*biquad_coefficients(mode, float(cutoff), q, rate), samples)
+    output = np.empty_like(samples)
+    state = np.zeros(2)
+    block = max(32, int(rate // 1000))
+    for start in range(0, len(samples), block):
+        stop = min(start + block, len(samples))
+        b, a = biquad_coefficients(mode, float(cutoff[(start + stop) // 2]), q, rate)
+        output[start:stop], state = signal.lfilter(b, a, samples[start:stop], zi=state)
+    return output
+
+
+def polyblep(position: np.ndarray, step: np.ndarray) -> np.ndarray:
+    """Band-limiting correction for a unit step at phase 0, for phase positions in [0, 1)."""
+    correction = np.zeros_like(position)
+    rising = position < step
+    x = position[rising] / step[rising]
+    correction[rising] = x + x - x * x - 1.0
+    falling = position > 1.0 - step
+    x = (position[falling] - 1.0) / step[falling]
+    correction[falling] = x * x + x + x + 1.0
+    return correction
+
+
+def reverb_impulse(decay_seconds: float, rate: float, seed: int) -> np.ndarray:
+    """A deterministic, energy-normalised room tail: decaying noise reaching -60 dB at decay_seconds, darkened above 6 kHz."""
+    predelay = int(REVERB_PREDELAY_SECONDS * rate)
+    length = max(1, int(decay_seconds * rate))
+    tail = np.random.default_rng(seed).normal(0, 1, length) * 10.0 ** (-3.0 * np.arange(length) / length)
+    tail = signal.lfilter(*biquad_coefficients("lowpass", 6000.0, math.sqrt(0.5), rate), tail)
+    impulse = np.concatenate((np.zeros(predelay), tail))
+    return impulse / max(float(np.sqrt(np.sum(impulse ** 2))), 1e-12)
+
+
 def generate_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, Any]]:
     """Synthesize deterministic high-quality mono audio, then downsample for game-ready export."""
     state = validate_state(raw_state)
@@ -401,12 +468,17 @@ def generate_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, 
         if state["pitch_jitter_hz"]: frequency += random_source.normal(0, state["pitch_jitter_hz"], count)
         frequency = np.clip(frequency, 1, rate * .45)
         phase = math.radians(layer["phase_degrees"]) + math.tau * np.cumsum(frequency) / rate
-        if layer["waveform"] == "square": signal = np.sign(np.sin(phase))
-        elif layer["waveform"] == "triangle": signal = 2 / math.pi * np.arcsin(np.sin(phase))
-        elif layer["waveform"] == "sawtooth": signal = 2 * ((phase / math.tau) % 1) - 1
-        else: signal = np.sin(phase)
+        if layer["waveform"] in ("square", "sawtooth"):
+            # PolyBLEP smooths each jump in the waveform so it does not alias into false tones.
+            position, step = (phase / math.tau) % 1.0, frequency / rate
+            if layer["waveform"] == "sawtooth":
+                signal_wave = 2 * position - 1 - polyblep(position, step)
+            else:
+                signal_wave = np.where(position < .5, 1.0, -1.0) + polyblep(position, step) - polyblep((position + .5) % 1.0, step)
+        elif layer["waveform"] == "triangle": signal_wave = 2 / math.pi * np.arcsin(np.sin(phase))
+        else: signal_wave = np.sin(phase)
         amplitude = 1 - layer["lfo_depth"] * .5 + np.sin(math.tau * layer["lfo_frequency"] * time) * layer["lfo_depth"] * .5
-        samples += signal * layer["gain"] * amplitude * adsr(time - layer["start_time"], layer["end_time"] - layer["start_time"], layer) * mask
+        samples += signal_wave * layer["gain"] * amplitude * adsr(time - layer["start_time"], layer["end_time"] - layer["start_time"], layer) * mask
 
     if state["noise_enabled"]:
         noise = random_source.normal(0, 1, count)
@@ -427,34 +499,32 @@ def generate_samples(raw_state: dict[str, Any]) -> tuple[list[float], dict[str, 
     samples *= master
     if state["transient_gain"]: samples += random_source.normal(0, 1, count) * state["transient_gain"] * np.exp(-time / state["transient_decay"])
 
-    cutoff = state["filter_cutoff_hz"] * (1 + state["filter_envelope_amount"] * (state["sustain"] - .5))
-    if cutoff > 0:
-        alpha = min(.99, math.tau * cutoff / (rate + math.tau * cutoff))
-        low = np.empty_like(samples); low[0] = samples[0]
-        for i in range(1, count): low[i] = low[i-1] + alpha * (samples[i] - low[i-1])
-        high = samples - low
-        if state["filter_mode"] == "highpass": samples = high
-        elif state["filter_mode"] == "bandpass": samples = high * low * (1 + state["filter_resonance"] * 8)
-        elif state["filter_mode"] == "notch": samples = samples - high * state["filter_resonance"]
-        else: samples = low
-    for formant in (state["formant_low_hz"], state["formant_high_hz"]):
-        if formant > 0:
-            carrier = np.sin(math.tau * formant * time)
-            samples += samples * carrier * .18
+    if state["filter_cutoff_hz"] > 0:
+        cutoff: np.ndarray | float = state["filter_cutoff_hz"]
+        if state["filter_envelope_amount"]:
+            # The envelope moves the cutoff up (or down) by as much as four octaves, following the master envelope.
+            cutoff = state["filter_cutoff_hz"] * 2.0 ** (state["filter_envelope_amount"] * FILTER_ENVELOPE_OCTAVES * master)
+        samples = apply_filter(samples, state["filter_mode"], cutoff, resonance_q(state["filter_resonance"]), rate)
+    formants = [(frequency, q, gain) for frequency, q, gain in ((state["formant_low_hz"], 6.0, 1.0), (state["formant_high_hz"], 9.0, .7)) if frequency > 0]
+    if formants:
+        # Vowel-like resonances: narrow band-pass peaks mixed over a quieter dry signal.
+        samples = .3 * samples + sum(gain * apply_filter(samples, "bandpass", frequency, q, rate) for frequency, q, gain in formants)
     if state["distortion"]:
         drive = 1 + state["distortion"] * 14
         samples = np.tanh(samples * drive) / math.tanh(drive)
+    if factor > 1:
+        samples = signal.resample_poly(samples, 1, factor)
+    # Delay and reverb are linear, so they run after downsampling at a quarter of the cost.
     if state["delay_time"] and state["delay_mix"]:
-        delay = max(1, int(state["delay_time"] * rate)); wet = np.zeros_like(samples)
-        for i in range(delay, count): wet[i] = samples[i-delay] + wet[i-delay] * state["delay_feedback"]
+        delay = max(1, int(state["delay_time"] * output_rate)); wet = np.zeros_like(samples)
+        for start in range(delay, len(samples), delay):
+            stop = min(start + delay, len(samples))
+            wet[start:stop] = samples[start - delay:stop - delay] + wet[start - delay:stop - delay] * state["delay_feedback"]
         samples = samples * (1 - state["delay_mix"]) + wet * state["delay_mix"]
     if state["reverb_mix"]:
-        wet = samples.copy()
-        for seconds, gain in ((.029,.38),(.047,.27),(.071,.19),(.113,.13)):
-            delay = int(seconds * rate); wet[delay:] += samples[:-delay] * gain
-        samples = samples * (1-state["reverb_mix"]) + wet * state["reverb_mix"]
-    if factor > 1:
-        kernel = np.hanning(17); kernel /= kernel.sum(); samples = np.convolve(samples, kernel, mode="same")[::factor]
+        impulse = reverb_impulse(state["reverb_decay"], output_rate, state["noise_seed"] + 31)
+        wet = signal.fftconvolve(samples, impulse)[:len(samples)]
+        samples = samples * (1 - state["reverb_mix"]) + wet * state["reverb_mix"]
     peak = max(float(np.max(np.abs(samples))), 1e-9)
     scale = min(1 / peak, 4) * state["master_gain"] if state["normalize"] else state["master_gain"]
     return np.clip(samples * scale, -1, 1).tolist(), state
@@ -586,6 +656,10 @@ class SfxDesigner:
         self.state = default_state()
         self.preview_file: str | None = None
         self._waveform_job: str | None = None
+        self._render_generation = 0
+        self._render_results: queue.Queue[tuple[int, Any, Exception | None]] = queue.Queue()
+        self._render_polling = False
+        self._last_render: tuple[list[float], dict[str, Any]] | None = None
         self.global_vars: dict[str, Any] = {}
         self.layer_vars: list[dict[str, Any]] = []
         self.selected_layer_var = tk.IntVar(value=0)
@@ -637,11 +711,11 @@ class SfxDesigner:
         ttk.Label(preview, text="Generated waveform", font=("Segoe UI", 11, "bold")).pack(anchor="w")
         self.canvas = tk.Canvas(preview, height=240, background="#10131a", highlightthickness=0)
         self.canvas.pack(fill="x", pady=(8, 12))
-        self.canvas.bind("<Configure>", lambda _event: self.refresh_waveform())
+        self.canvas.bind("<Configure>", lambda _event: self._draw_render())
         ttk.Label(preview, text="Frequency spectrum", font=("Segoe UI", 11, "bold")).pack(anchor="w")
         self.spectrum_canvas = tk.Canvas(preview, height=145, background="#10131a", highlightthickness=0)
         self.spectrum_canvas.pack(fill="x", pady=(8, 12))
-        self.spectrum_canvas.bind("<Configure>", lambda _event: self.refresh_waveform())
+        self.spectrum_canvas.bind("<Configure>", lambda _event: self._draw_render())
         ttk.Label(preview, text="Output is 16-bit mono PCM WAV, which game engines and audio tools import directly.", wraplength=330).pack(anchor="w")
         ttk.Label(self.root, textvariable=self.status, relief=tk.SUNKEN, anchor="w", padding=(8, 4)).grid(row=2, column=0, sticky="ew")
 
@@ -870,6 +944,7 @@ class SfxDesigner:
         self._add_field(effects_frame, 1, 4, "Delay feedback", "delay_feedback", 0.25)
         self._add_field(effects_frame, 1, 6, "Delay mix", "delay_mix", 0.0)
         self._add_field(effects_frame, 2, 0, "Reverb mix", "reverb_mix", 0.0)
+        self._add_field(effects_frame, 2, 2, "Reverb decay s", "reverb_decay", 0.8)
 
         realism_frame = ttk.LabelFrame(realism_tab, text="Realism DSP", padding=8)
         realism_frame.grid(row=3, column=0, sticky="ew", pady=(0, 8))
@@ -1168,7 +1243,7 @@ class SfxDesigner:
         state = default_state()
         for key in ("name",):
             state[key] = self.global_vars[key].get()
-        for key in ("duration", "master_gain", "attack", "decay", "sustain", "release", "noise_gain", "distortion", "delay_time", "delay_feedback", "delay_mix", "reverb_mix", "filter_cutoff_hz", "filter_resonance", "filter_envelope_amount", "transient_gain", "transient_decay", "pitch_drift_hz", "pitch_jitter_hz", "formant_low_hz", "formant_high_hz"):
+        for key in ("duration", "master_gain", "attack", "decay", "sustain", "release", "noise_gain", "distortion", "delay_time", "delay_feedback", "delay_mix", "reverb_mix", "reverb_decay", "filter_cutoff_hz", "filter_resonance", "filter_envelope_amount", "transient_gain", "transient_decay", "pitch_drift_hz", "pitch_jitter_hz", "formant_low_hz", "formant_high_hz"):
             state[key] = self._number(self.global_vars[key], key.replace("_", " "))
         state["variation_amount"] = self._number(self.global_vars["variation_amount"], "variation percentage") / 100.0
         state["sample_rate"] = int(self.global_vars["sample_rate"].get())
@@ -1248,14 +1323,53 @@ class SfxDesigner:
         return samples, normalized
 
     def refresh_waveform(self) -> None:
+        """Render the current design on a background thread, then draw it, so long sounds never freeze the window."""
         if not hasattr(self, "canvas"):
             return
+        self._waveform_job = None
         try:
-            samples, _state = self._generate()
+            state = self._state_from_ui()
         except (ValueError, OverflowError) as error:
             self.status.set(str(error))
             return
-        self._waveform_job = None
+        self._render_generation += 1
+        generation = self._render_generation
+        self.status.set("Rendering…")
+
+        def render() -> None:
+            try:
+                self._render_results.put((generation, generate_samples(state), None))
+            except (ValueError, OverflowError) as error:
+                self._render_results.put((generation, None, error))
+
+        threading.Thread(target=render, daemon=True).start()
+        if not self._render_polling:
+            self._render_polling = True
+            self.root.after(20, self._collect_render)
+
+    def _collect_render(self) -> None:
+        # Renders can finish out of order; only the one matching the newest request is drawn.
+        newest = None
+        while not self._render_results.empty():
+            item = self._render_results.get_nowait()
+            if item[0] == self._render_generation:
+                newest = item
+        if newest is None:
+            self.root.after(20, self._collect_render)
+            return
+        self._render_polling = False
+        _generation, result, error = newest
+        if error is not None:
+            self.status.set(str(error))
+            return
+        self._last_render = result
+        self.state = result[1]
+        self._draw_render()
+
+    def _draw_render(self) -> None:
+        if self._last_render is None:
+            return
+        samples, _state = self._last_render
         canvas = self.canvas
         canvas.delete("all")
         width, height = max(10, canvas.winfo_width()), max(10, canvas.winfo_height())

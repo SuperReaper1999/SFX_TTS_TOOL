@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Linux (Kubuntu) launcher for SFX TTS Tool.
-# First run creates a private virtual environment in .venv and installs NumPy into it.
+# First run creates a private virtual environment in .venv and installs NumPy and SciPy into it.
 set -euo pipefail
 TOOL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$TOOL_ROOT"
@@ -18,8 +18,8 @@ if [ ! -x "$VENV/bin/python" ]; then
         exit 1
     fi
 fi
-if ! "$VENV/bin/python" -c "import numpy" >/dev/null 2>&1; then
-    echo "Installing NumPy into $VENV ..."
+if ! "$VENV/bin/python" -c "import numpy, scipy" >/dev/null 2>&1; then
+    echo "Installing NumPy and SciPy into $VENV ..."
     "$VENV/bin/python" -m pip install -r "$TOOL_ROOT/requirements.txt"
 fi
 # Tkinter may be system-wide or extracted into .venv, so check it with the venv's Python.

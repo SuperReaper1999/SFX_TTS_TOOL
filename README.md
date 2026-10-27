@@ -12,7 +12,7 @@ Double-click `Run Sine SFX Designer.bat`, or run:
 python sine_sfx_designer.py
 ```
 
-Python 3 must be installed and available on your `PATH`. Install the single DSP dependency once:
+Python 3 must be installed and available on your `PATH`. Install the two DSP dependencies (NumPy and SciPy) once:
 
 ```powershell
 python -m pip install -r requirements.txt
@@ -40,7 +40,7 @@ Then run from the tool folder:
 ./run-sfx-designer.sh
 ```
 
-The first run creates a private `.venv` in the tool folder and installs NumPy into it, so nothing is installed system-wide. Previews play through the first available command-line player: `pw-play` (PipeWire, standard on current Kubuntu), `paplay`, `aplay`, or `ffplay`. If none is present, install `pipewire-bin`, `pulseaudio-utils`, or `alsa-utils`. Preset favourites are stored in `~/.config/SfxTtsTool/`.
+The first run creates a private `.venv` in the tool folder and installs NumPy and SciPy into it, so nothing is installed system-wide. If you already have a `.venv` from an earlier version, the launcher adds SciPy automatically on its next run. Previews play through the first available command-line player: `pw-play` (PipeWire, standard on current Kubuntu), `paplay`, `aplay`, or `ffplay`. If none is present, install `pipewire-bin`, `pulseaudio-utils`, or `alsa-utils`. Preset favourites are stored in `~/.config/SfxTtsTool/`.
 
 ## Workflow
 
@@ -55,7 +55,7 @@ Each of the four layers has its own sine, square, triangle, or sawtooth oscillat
 
 Use the **Quick global sliders** for fast shaping and the **Quick selected-layer sliders** for frequency, gain, FM depth, and LFO depth. Numeric fields remain available alongside them for exact values; the frequency slider uses a logarithmic scale so low and high frequencies are both practical to adjust.
 
-The Realism tab adds a **High** render quality, which renders at 4× the sample rate and then softly filters back down. It noticeably softens content above about 10 kHz and does not band-limit the square and sawtooth oscillators. It also adds noise in four colours: white (flat), pink (falls 3 dB per octave), brown (falls 6 dB per octave), and band (gently low-passed white). There is one gentle filter (6 dB per octave) with a single **Cutoff Hz** control (0 turns it off) and four modes: low-pass, high-pass, bandpass (which multiplies the low and high bands, so it adds grit), and notch (which cuts high content by the resonance amount). **Resonance** only affects the bandpass and notch modes, and **Filter envelope** shifts the cutoff once, by the sustain level, rather than sweeping it over time. The rest of the tab covers transient bursts, pitch drift and jitter, formant tones (ring modulation at the chosen frequencies, which gives a metallic, vocal-ish edge rather than true vowel filtering), soft distortion, feedback delay, and a short room effect of four early echoes within about 0.1 s rather than a long reverb tail. These are tuned for weapon impacts and zombie vocalisations while retaining mono output that suits positional audio in game engines.
+The Realism tab adds a **High** render quality, which renders at 4× the sample rate and filters cleanly back down, keeping the full frequency range. Square and sawtooth oscillators are band-limited (PolyBLEP) in both qualities, so high notes do not alias into false tones; High removes most of what remains. Noise comes in four colours: white (flat), pink (falls 3 dB per octave), brown (falls 6 dB per octave), and band (gently low-passed white). The filter is a 12 dB-per-octave resonant filter with a **Cutoff Hz** control (0 turns it off) and four modes: low-pass, high-pass, bandpass, and notch. **Resonance** adds a peak at the cutoff (up to about +21 dB) for low-pass and high-pass, and narrows the bandpass and notch. **Filter envelope** sweeps the cutoff with the master envelope, by up to four octaves up (positive values) or down (negative values), which gives plucks and swells their movement. **Formant low/high Hz** add two vowel-like resonances at those frequencies (for example 700 and 1800 Hz for an open "ah"), which suit groans and screams. The rest of the tab covers transient bursts, pitch drift and jitter, soft distortion, feedback delay, and a reverb whose **Reverb decay s** sets how long the tail takes to fade by 60 dB. The tail is cut at the end of the sound, so lengthen **Duration** to hear all of it. These are tuned for weapon impacts and zombie vocalisations while retaining mono output that suits positional audio in game engines.
 
 ## Preset browser
 

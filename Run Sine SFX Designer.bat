@@ -1,9 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-python -c "import numpy" 2>nul
+python -c "import numpy, scipy" 2>nul
 if errorlevel 1 (
-    echo NumPy is required for high-quality SFX rendering.
+    echo NumPy and SciPy are required for high-quality SFX rendering.
     echo Run: python -m pip install -r requirements.txt
     pause
     exit /b 1
