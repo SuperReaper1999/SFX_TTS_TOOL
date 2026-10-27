@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import threading
+import zlib
 from pathlib import Path
 from typing import Callable
 
@@ -16,6 +17,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import audio_playback
+from voice_effects import OUTPUT_RATES, VOICE_EFFECTS, process_wav
 
 KOKORO_VOICES = (
     "bf_emma", "bf_isabella", "bf_lily", "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
@@ -35,7 +37,7 @@ def safe_filename(value: str) -> str:
     return cleaned.strip("_") or "dialogue_line"
 
 
-LINE_FIELDS = ("speaker", "voice", "line_id", "text", "notes", "speed")
+LINE_FIELDS = ("speaker", "voice", "line_id", "text", "notes", "speed", "effect")
 
 
 def config_dir() -> Path:
@@ -62,7 +64,8 @@ def load_speaker_profiles(path: Path) -> dict[str, dict[str, str]]:
     if not isinstance(saved, dict):
         return {name: dict(profile) for name, profile in SPEAKER_PROFILES.items()}
     return {
-        str(name): {"voice": str(profile.get("voice")), "notes": str(profile.get("notes", ""))}
+        str(name): {"voice": str(profile.get("voice")), "notes": str(profile.get("notes", "")),
+                    "effect": profile.get("effect") if profile.get("effect") in VOICE_EFFECTS else "None"}
         for name, profile in saved.items()
         if isinstance(profile, dict) and profile.get("voice") in KOKORO_VOICES
     }
@@ -90,9 +93,9 @@ def parse_script(path: Path, profiles: dict[str, dict[str, str]], default_speake
         reader = csv.DictReader(content.splitlines())
         columns = {name.strip().lower(): name for name in reader.fieldnames or []}
         if "text" not in columns:
-            raise ValueError("The CSV needs a header row with a 'text' column (optional: speaker, line_id, voice, speed, notes).")
+            raise ValueError("The CSV needs a header row with a 'text' column (optional: speaker, line_id, voice, speed, notes, effect).")
         for number, record in enumerate(reader, start=2):
-            row = {key: (record.get(columns[key]) or "").strip() for key in ("speaker", "line_id", "id", "text", "voice", "speed", "notes") if key in columns}
+            row = {key: (record.get(columns[key]) or "").strip() for key in ("speaker", "line_id", "id", "text", "voice", "speed", "notes", "effect") if key in columns}
             if row.get("text"):
                 row["line_id"] = row.get("line_id") or row.get("id", "")
                 rows.append((number, row))
@@ -119,6 +122,10 @@ def parse_script(path: Path, profiles: dict[str, dict[str, str]], default_speake
             raise ValueError(f"Line {number}: speed must be a number between 0.5 and 1.5.") from None
         if not 0.5 <= speed <= 1.5:
             raise ValueError(f"Line {number}: speed must be between 0.5 and 1.5.")
+        effect_names = {name.lower(): name for name in VOICE_EFFECTS}
+        effect = effect_names.get((row.get("effect") or profile.get("effect") or "None").lower())
+        if effect is None:
+            raise ValueError(f"Line {number}: unknown voice effect '{row.get('effect')}' (use one of: {', '.join(VOICE_EFFECTS)}).")
         if row.get("line_id"):
             # Explicit IDs replace a queued line with the same speaker and ID, so an edited script can be re-imported.
             line_id = safe_filename(row["line_id"])
@@ -130,7 +137,7 @@ def parse_script(path: Path, profiles: dict[str, dict[str, str]], default_speake
                 line_id = next_line_id(line_id)
         seen.add((speaker, line_id))
         lines.append({"speaker": speaker, "voice": voice, "line_id": line_id, "text": row["text"],
-                      "notes": row.get("notes") or profile.get("notes", ""), "speed": str(speed)})
+                      "notes": row.get("notes") or profile.get("notes", ""), "speed": str(speed), "effect": effect})
     return lines
 
 
@@ -284,16 +291,20 @@ class DialogueStudio:
         saved_queue = load_json(self.queue_path)
         saved_queue = saved_queue if isinstance(saved_queue, dict) else {}
         self.lines: list[dict[str, str]] = [
-            {field: str(line.get(field, "")) for field in LINE_FIELDS}
+            {**{field: str(line.get(field, "")) for field in LINE_FIELDS},
+             "effect": line.get("effect") if line.get("effect") in VOICE_EFFECTS else "None"}
             for line in saved_queue.get("lines", []) if isinstance(line, dict) and line.get("text")
         ] if isinstance(saved_queue.get("lines"), list) else []
         self.output_dir = tk.StringVar(value=str(saved_queue.get("output_dir") or Path.cwd() / "GeneratedDialogue"))
+        saved_rate = str(saved_queue.get("output_rate", OUTPUT_RATES[0]))
+        self.output_rate = tk.StringVar(value=saved_rate if saved_rate in OUTPUT_RATES else OUTPUT_RATES[0])
         first_speaker = "Autumn" if "Autumn" in self.profiles else next(iter(self.profiles), "Custom")
-        first_profile = self.profiles.get(first_speaker, {"voice": KOKORO_VOICES[0], "notes": ""})
+        first_profile = self.profiles.get(first_speaker, {"voice": KOKORO_VOICES[0], "notes": "", "effect": "None"})
         self.speaker = tk.StringVar(value=first_speaker)
         self.voice = tk.StringVar(value=first_profile["voice"])
         self.line_id = tk.StringVar(value=f"{safe_filename(first_speaker).lower()}_intro_01")
         self.notes = tk.StringVar(value=first_profile["notes"])
+        self.effect = tk.StringVar(value=first_profile.get("effect", "None"))
         self.speed = tk.StringVar(value="1.0")
         self.tree: ttk.Treeview | None = None
         self.text: tk.Text | None = None
@@ -302,6 +313,7 @@ class DialogueStudio:
         self.generate_queue_button: ttk.Button | None = None
         self._warmed_up = False
         self.output_dir.trace_add("write", lambda *_arguments: self._save_queue())
+        self.output_rate.trace_add("write", lambda *_arguments: self._save_queue())
 
     def build(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
@@ -337,7 +349,9 @@ class DialogueStudio:
         ttk.Entry(form, textvariable=self.speed).grid(row=1, column=3, sticky="ew", pady=3)
 
         ttk.Label(form, text="Character notes").grid(row=2, column=0, sticky="nw", padx=(0, 6), pady=(6, 3))
-        ttk.Entry(form, textvariable=self.notes).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(6, 3))
+        ttk.Entry(form, textvariable=self.notes).grid(row=2, column=1, sticky="ew", pady=(6, 3))
+        ttk.Label(form, text="Voice effect").grid(row=2, column=2, sticky="w", padx=(12, 6), pady=(6, 3))
+        ttk.Combobox(form, textvariable=self.effect, values=tuple(VOICE_EFFECTS), state="readonly", width=16).grid(row=2, column=3, sticky="ew", pady=(6, 3))
         ttk.Label(form, text="Dialogue text").grid(row=3, column=0, sticky="nw", padx=(0, 6), pady=(6, 3))
         self.text = tk.Text(form, height=5, wrap="word", undo=True)
         self.text.grid(row=3, column=1, columnspan=3, sticky="ew", pady=(6, 3))
@@ -345,7 +359,7 @@ class DialogueStudio:
         profile_actions.grid(row=4, column=1, columnspan=3, sticky="w", pady=(6, 0))
         ttk.Button(profile_actions, text="Save Profile", command=self._save_profile).pack(side="left")
         ttk.Button(profile_actions, text="Delete Profile", command=self._delete_profile).pack(side="left", padx=6)
-        ttk.Label(profile_actions, text="Type a new speaker name to create a profile from the current voice and notes.").pack(side="left", padx=6)
+        ttk.Label(profile_actions, text="Type a new speaker name to create a profile from the current voice, notes and effect.").pack(side="left", padx=6)
 
         output = ttk.Frame(parent)
         output.grid(row=2, column=0, sticky="ew", pady=(0, 8))
@@ -353,6 +367,8 @@ class DialogueStudio:
         ttk.Label(output, text="Output folder").grid(row=0, column=0, sticky="w", padx=(0, 6))
         ttk.Entry(output, textvariable=self.output_dir).grid(row=0, column=1, sticky="ew")
         ttk.Button(output, text="Browse…", command=self._choose_output).grid(row=0, column=2, padx=(6, 0))
+        ttk.Label(output, text="Sample rate").grid(row=0, column=3, sticky="w", padx=(12, 6))
+        ttk.Combobox(output, textvariable=self.output_rate, values=OUTPUT_RATES, state="readonly", width=8).grid(row=0, column=4, sticky="w")
         ttk.Button(output, text="Add Current Line", command=self._add_current).grid(row=1, column=0, pady=(8, 0), sticky="w")
         self.generate_current_button = ttk.Button(output, text="Generate Current WAV", command=self._generate_current)
         self.generate_current_button.grid(row=1, column=1, pady=(8, 0), sticky="w")
@@ -361,8 +377,8 @@ class DialogueStudio:
         queue_frame.grid(row=3, column=0, sticky="nsew")
         queue_frame.columnconfigure(0, weight=1)
         queue_frame.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(queue_frame, columns=("speaker", "line_id", "voice", "preview"), show="headings", height=9, selectmode="extended")
-        for name, heading, width in (("speaker", "Speaker", 120), ("line_id", "Line ID", 190), ("voice", "Voice", 100), ("preview", "Text", 340)):
+        self.tree = ttk.Treeview(queue_frame, columns=("speaker", "line_id", "voice", "effect", "preview"), show="headings", height=9, selectmode="extended")
+        for name, heading, width in (("speaker", "Speaker", 120), ("line_id", "Line ID", 190), ("voice", "Voice", 100), ("effect", "Effect", 100), ("preview", "Text", 300)):
             self.tree.heading(name, text=heading)
             self.tree.column(name, width=width, stretch=name == "preview")
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -386,13 +402,14 @@ class DialogueStudio:
             return
         self.voice.set(profile["voice"])
         self.notes.set(profile["notes"])
+        self.effect.set(profile.get("effect", "None"))
         self.line_id.set(f"{safe_filename(self.speaker.get()).lower()}_line_01")
 
     def _save_profile(self) -> None:
         name = self.speaker.get().strip()
         if not name:
             messagebox.showwarning("Dialogue Studio", "Type a speaker name before saving a profile."); return
-        self.profiles[name] = {"voice": self.voice.get(), "notes": self.notes.get().strip()}
+        self.profiles[name] = {"voice": self.voice.get(), "notes": self.notes.get().strip(), "effect": self.effect.get()}
         self._store_profiles()
         self.set_status(f"Saved speaker profile: {name}")
 
@@ -416,7 +433,7 @@ class DialogueStudio:
 
     def _save_queue(self) -> None:
         try:
-            save_json(self.queue_path, {"version": 1, "output_dir": self.output_dir.get(), "lines": self.lines})
+            save_json(self.queue_path, {"version": 1, "output_dir": self.output_dir.get(), "output_rate": self.output_rate.get(), "lines": self.lines})
         except OSError as error:
             self.set_status(f"Could not save the dialogue queue: {error}")
 
@@ -469,7 +486,7 @@ class DialogueStudio:
             raise ValueError("Speech speed must be between 0.5 and 1.5.")
         return {
             "speaker": self.speaker.get(), "voice": self.voice.get(), "line_id": safe_filename(self.line_id.get()),
-            "text": self.text.get("1.0", "end-1c").strip(), "notes": self.notes.get().strip(), "speed": str(speed),
+            "text": self.text.get("1.0", "end-1c").strip(), "notes": self.notes.get().strip(), "speed": str(speed), "effect": self.effect.get(),
         }
 
     def _add_current(self) -> None:
@@ -489,7 +506,7 @@ class DialogueStudio:
         assert self.tree is not None
         self.tree.delete(*self.tree.get_children())
         for index, line in enumerate(self.lines):
-            self.tree.insert("", "end", iid=str(index), values=(line["speaker"], line["line_id"], line["voice"], line["text"].replace("\n", " ")[:70]))
+            self.tree.insert("", "end", iid=str(index), values=(line["speaker"], line["line_id"], line["voice"], line.get("effect", "None"), line["text"].replace("\n", " ")[:70]))
 
     def _remove_selected(self) -> None:
         assert self.tree is not None
@@ -512,17 +529,20 @@ class DialogueStudio:
 
     def _start_generation(self, lines: list[dict[str, str]]) -> None:
         self._set_busy(True); self.set_status(f"Generating {len(lines)} local Kokoro WAV file(s)…")
-        threading.Thread(target=self._generate_worker, args=(lines,), daemon=True).start()
+        directory = Path(self.output_dir.get()).expanduser()
+        threading.Thread(target=self._generate_worker, args=(lines, directory, int(self.output_rate.get())), daemon=True).start()
 
-    def _generate_worker(self, lines: list[dict[str, str]]) -> None:
+    def _generate_worker(self, lines: list[dict[str, str]], directory: Path, output_rate: int) -> None:
         try:
-            directory = Path(self.output_dir.get()).expanduser(); directory.mkdir(parents=True, exist_ok=True)
+            directory.mkdir(parents=True, exist_ok=True)
             generated: list[dict[str, str]] = []
             for index, line in enumerate(lines, start=1):
                 self.root.after(0, self.set_status, f"Generating {index}/{len(lines)} locally: {line['line_id']}")
                 filename = f"{safe_filename(line['speaker'])}_{safe_filename(line['line_id'])}.wav"
                 generate_kokoro_wav(line["text"], line["voice"], float(line["speed"]), directory / filename)
-                generated.append({**line, "file": filename})
+                effect = line.get("effect", "None")
+                rate = process_wav(directory / filename, effect, output_rate, seed=zlib.crc32(line["text"].encode("utf-8")))
+                generated.append({**line, "effect": effect, "file": filename, "sample_rate": str(rate)})
             self._write_manifest_file(directory, generated)
             self.root.after(0, self._generation_complete, directory, len(generated))
         except Exception as error:

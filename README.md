@@ -95,7 +95,25 @@ The queue and output folder are saved automatically and restored next time you o
 
 ### Speaker profiles
 
-A profile remembers a speaker's Kokoro voice and character notes. Pick one to fill in its voice and notes, or type a new speaker name, set the voice and notes, and select **Save Profile**. **Delete Profile** removes the selected one; queued lines keep their own voice. Profiles are stored in your settings folder (`%APPDATA%\SfxTtsTool` on Windows, `~/.config/SfxTtsTool` on Linux) along with the saved queue.
+A profile remembers a speaker's Kokoro voice, character notes, and voice effect. Pick one to fill in its voice and notes, or type a new speaker name, set the voice and notes, and select **Save Profile**. **Delete Profile** removes the selected one; queued lines keep their own voice. Profiles are stored in your settings folder (`%APPDATA%\SfxTtsTool` on Windows, `~/.config/SfxTtsTool` on Linux) along with the saved queue.
+
+### Voice effects and sample rate
+
+Each line has a **Voice effect**, applied after Kokoro generates it:
+
+| Effect | Sound |
+|---|---|
+| None | Kokoro's voice unchanged |
+| Radio | Narrow 300–3,200 Hz band, light saturation, faint hiss |
+| Walkie-talkie | Narrower and grittier than Radio, with a squelch click at the start and a burst of static at the end |
+| Phone | Clean 350–3,400 Hz telephone band |
+| Megaphone | Honky, resonant, heavily driven, with a short echo |
+| Distant | Dull and far away: highs removed, mostly reverb |
+| Large hall | Full voice in a big, long-reverb space |
+
+Effects keep the line's original peak level, and reverb effects lengthen the clip so the tail is not cut off. Lines with no effect are written exactly as Kokoro produced them.
+
+**Sample rate** next to the output folder sets the rate of every generated file: 24,000 Hz (Kokoro's own) or 44,100 or 48,000 Hz to match your sound effects. The manifest records each line's effect and sample rate.
 
 ### Importing a script
 
@@ -109,14 +127,14 @@ Autumn: Stay close. Whatever is out there heard the gunshot.
 Reeves: Right then. Kettle on, and nobody opens that door.
 ```
 
-A CSV needs a header row with a `text` column, and can also have `speaker`, `line_id`, `voice`, `speed`, and `notes` columns:
+A CSV needs a header row with a `text` column, and can also have `speaker`, `line_id`, `voice`, `speed`, `notes`, and `effect` columns:
 
 ```text
 speaker,line_id,text,voice,speed
 Narrator,narr_open,The town fell quiet before dawn.,,0.9
 ```
 
-Empty voice and notes come from the speaker's profile. Lines without an ID are numbered per speaker (`autumn_01`, `autumn_02`, …), skipping IDs already queued. A line with an explicit ID replaces the queued line with the same speaker and ID, so you can edit a script and import it again.
+Empty voice, notes, and effect come from the speaker's profile, and effect names are not case-sensitive. Lines without an ID are numbered per speaker (`autumn_01`, `autumn_02`, …), skipping IDs already queued. A line with an explicit ID replaces the queued line with the same speaker and ID, so you can edit a script and import it again.
 
 There is no API key, OpenAI account, or per-line bill. Kokoro runs locally after its one-time download. Its Apache-2.0 model weighs roughly 363 MB, so it is deliberately kept out of the repository and C: drive.
 
